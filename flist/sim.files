@@ -1,0 +1,8 @@
+#/home/u/altera/13.1/quartus/eda/sim_lib/altera_mf.v
+#/mnt/c/intelFPGA_lite/19.1/quartus/eda/sim_lib/altera_mf.v
+
+${PROJECT_ROOT}/simulation/altera_mf.v
+
+${PROJECT_ROOT}/rtl/lib/swrvr_clib.v \
+${PROJECT_ROOT}/rtl/lib/swrvr_dlib.v \
+${PROJECT_ROOT}/rtl/c7bifu_fcl.v 
