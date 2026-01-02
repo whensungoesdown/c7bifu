@@ -5,4 +5,5 @@ ${PROJECT_ROOT}/simulation/altera_mf.v
 
 ${PROJECT_ROOT}/rtl/lib/swrvr_clib.v \
 ${PROJECT_ROOT}/rtl/lib/swrvr_dlib.v \
-${PROJECT_ROOT}/rtl/c7bifu_fcl.v 
+${PROJECT_ROOT}/rtl/c7bifu_fcl.v \ 
+${PROJECT_ROOT}/rtl/c7bifu.v 
