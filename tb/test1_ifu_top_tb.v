@@ -244,7 +244,7 @@ module top_tb();
 //        test_reset_sequence();
         
         // 测试不同ACK模式
-//        test_normal_increment_flow_next_cycle_ack();  // 下一周期ACK
+        test_normal_increment_flow_next_cycle_ack();  // 下一周期ACK
         test_normal_increment_flow_same_cycle_ack();  // 同一周期ACK
         
 //        test_mixed_ack_modes();  // 混合ACK模式
@@ -382,9 +382,9 @@ module top_tb();
     task automatic generate_data_valid;
         begin
             // 在ACK之后等待1-2个周期，然后给出data valid
-            wait_cycles(1 + ($random % 2));
-            @(posedge clk);
-            icu_ifu_data_valid_ic2 = 1'b1;
+            //wait_cycles(1 + ($random % 2));
+            //@(posedge clk);
+            icu_ifu_data_valid_ic2 = 1'b1; // send immediately, simulate icache hit
             @(posedge clk);
             icu_ifu_data_valid_ic2 = 1'b0;
             $display("Time=%t: Data valid generated", $time);
@@ -493,7 +493,25 @@ module top_tb();
         end
     endtask
     
-    // Test 3: Normal increment flow with same-cycle ACK
+    // Test 3: Normal increment flow with same-cycle ACK, next cycle dvalid
+    // # clk    : ^^^^^^^^^^
+    // # resetn : ----------
+    // # req    : --__-__-__
+    // # ack    : _-__-__-__
+    // # valid  : __-__-__-_
+    // # except : __________
+    // # branch : __________
+    // # ertn   : __________
+    // # ------------------------------------------------
+    // # PF Address Selection:
+    // # pf_init: __________ (select initial address)
+    // # pf_old : ---_--_--_ (select old/stall address)
+    // # pf_inc : ___-__-__- (select increment address)
+    // # pf_brn : __________ (select branch address)
+    // # pf_isr : __________ (select exception address)
+    // # pf_ert : __________ (select ertn address)
+    // # pf_en  : ___-__-__- (address update enable)
+
     task automatic test_normal_increment_flow_same_cycle_ack;
         reg passed;
         integer i;
@@ -504,49 +522,109 @@ module top_tb();
             // Set ACK mode to same-cycle
             ack_mode = 1'b1;
             
-            //// Start from reset state
-            //resetn = 1'b0;
-            //wait_cycles(5);
-            //resetn = 1'b1;
-            //wait_cycles(2);
+            // Start from reset state
+            resetn = 1'b0;
+            wait_cycles(5);
+            #2 resetn = 1'b1;
+            wait_cycles(2);
             
             expected_pc = 32'h1c000000;
             
-            // Test 3 normal increments with same-cycle ACK
-            for (i = 0; i < 3; i = i + 1) begin
-                $display("\n--- Cycle %0d ---", i);
-                
-                // Check current address
-                if (ifu_icu_addr_ic1 !== expected_pc) begin
-                    $display("ERROR: Cycle %0d - Expected: 0x%h, Got: 0x%h", 
-                            i, expected_pc, ifu_icu_addr_ic1);
-                    passed = 1'b0;
-                end else begin
-                    $display("OK: Cycle %0d address correct: 0x%h", i, expected_pc);
-                end
-                
-                // Wait for request to be high
-                wait_cycles(1);
-                
-                // Generate same-cycle ACK
-                if (ifu_icu_req_ic1 == 1'b1) begin
-                    // 在同一时钟周期内给ACK
-                    icu_ifu_ack_ic1 = 1'b1;
-                    print_realtime_waveform();
-                    
-                    @(posedge clk);
-                    icu_ifu_ack_ic1 = 1'b0;
-                    $display("Time=%t: Same-cycle ACK applied", $time);
-                end
-                
-                // Generate data valid
-                generate_data_valid();
-                
-                // PC should increment by 8
-                expected_pc = expected_pc + 32'h8;
-                
-                wait_cycles(1);
-            end
+	    // Test 3 normal increments with same-cycle ACK
+	    $display("\n--- Cycle %0d ---", 1);
+
+	    // Check current address
+	    if (ifu_icu_addr_ic1 !== expected_pc) begin
+		    $display("ERROR: Cycle %0d - Expected: 0x%h, Got: 0x%h", 
+			    i, expected_pc, ifu_icu_addr_ic1);
+		    passed = 1'b0;
+	    end else begin
+		    $display("OK: Cycle %0d address correct: 0x%h", i, expected_pc);
+	    end
+
+	    // Wait for request to be high
+	    //wait_cycles(1);
+
+	    // Generate same-cycle ACK
+	    //if (ifu_icu_req_ic1 == 1'b1) begin
+	    // 在同一时钟周期内给ACK
+	    icu_ifu_ack_ic1 = 1'b1;
+	    //print_realtime_waveform();
+
+	    @(posedge clk);
+	    icu_ifu_ack_ic1 = 1'b0;
+	    $display("Time=%t: Same-cycle ACK applied", $time);
+	    //end
+
+	    // Generate data valid
+	    generate_data_valid();
+
+	    // PC should increment by 8
+	    expected_pc = expected_pc + 32'h8;
+
+	    wait_cycles(1);
+
+	    $display("\n--- Cycle %0d ---", 2);
+
+	    // Check current address
+	    if (ifu_icu_addr_ic1 !== expected_pc) begin
+		    $display("ERROR: Cycle %0d - Expected: 0x%h, Got: 0x%h", 
+			    i, expected_pc, ifu_icu_addr_ic1);
+		    passed = 1'b0;
+	    end else begin
+		    $display("OK: Cycle %0d address correct: 0x%h", i, expected_pc);
+	    end
+
+	    // Wait for request to be high
+	    //wait_cycles(1);
+
+	    // Generate same-cycle ACK
+	    //if (ifu_icu_req_ic1 == 1'b1) begin
+	    // 在同一时钟周期内给ACK
+	    icu_ifu_ack_ic1 = 1'b1;
+	    //print_realtime_waveform();
+
+	    @(posedge clk);
+	    icu_ifu_ack_ic1 = 1'b0;
+	    $display("Time=%t: Same-cycle ACK applied", $time);
+
+	    // Generate data valid
+	    generate_data_valid();
+
+	    expected_pc = expected_pc + 32'h8;
+
+	    wait_cycles(1);
+
+	    $display("\n--- Cycle %0d ---", 3);
+
+	    // Check current address
+	    if (ifu_icu_addr_ic1 !== expected_pc) begin
+		    $display("ERROR: Cycle %0d - Expected: 0x%h, Got: 0x%h", 
+			    i, expected_pc, ifu_icu_addr_ic1);
+		    passed = 1'b0;
+	    end else begin
+		    $display("OK: Cycle %0d address correct: 0x%h", i, expected_pc);
+	    end
+
+	    // Wait for request to be high
+	    //wait_cycles(1);
+
+	    // Generate same-cycle ACK
+	    //if (ifu_icu_req_ic1 == 1'b1) begin
+	    // 在同一时钟周期内给ACK
+	    icu_ifu_ack_ic1 = 1'b1;
+	    //print_realtime_waveform();
+
+	    @(posedge clk);
+	    icu_ifu_ack_ic1 = 1'b0;
+	    $display("Time=%t: Same-cycle ACK applied", $time);
+
+	    // Generate data valid
+	    generate_data_valid();
+
+	    expected_pc = expected_pc + 32'h8;
+
+	    wait_cycles(1);
             
             // Final address check
             if (ifu_icu_addr_ic1 !== expected_pc) begin
