@@ -244,6 +244,7 @@ module top_tb();
 //        test_reset_sequence();
         
         // 测试不同ACK模式
+        test_normal_increment_flow_long_cycle_ack_long_dvalid();
         test_normal_increment_flow_next_cycle_ack();  // 下一周期ACK
         test_normal_increment_flow_same_cycle_ack();  // 同一周期ACK
         
@@ -390,6 +391,19 @@ module top_tb();
             $display("Time=%t: Data valid generated", $time);
         end
     endtask
+
+    // Task: Simulate data valid after ACK
+    task automatic generate_data_valid_longcycle;
+        begin
+            // 在ACK之后等待1-2个周期，然后给出data valid
+            wait_cycles(1 + ($random % 5));
+            @(posedge clk);
+            icu_ifu_data_valid_ic2 = 1'b1; // send immediately, simulate icache hit
+            @(posedge clk);
+            icu_ifu_data_valid_ic2 = 1'b0;
+            $display("Time=%t: Data valid generated", $time);
+        end
+    endtask
     
     // ================================
     // TEST CASES
@@ -432,6 +446,64 @@ module top_tb();
             end
             
             print_test_result("Reset Sequence Test", passed);
+        end
+    endtask
+
+    // Test 1.5: Normal increment flow with long-cycle ACK, long-cycle dvalid
+    task automatic test_normal_increment_flow_long_cycle_ack_long_dvalid;
+        reg passed;
+        integer i;
+        begin
+            print_test_start("Normal Increment Flow - Long-Cycle ACK, Long-Cycle dvalid");
+            passed = 1'b1;
+            
+            // Set ACK mode to next-cycle
+            ack_mode = 1'b0;
+            
+            // Start from reset state
+            resetn = 1'b0;
+            wait_cycles(1);
+            resetn = 1'b1;
+            wait_cycles(2);
+            
+            expected_pc = 32'h1c000000;
+            
+            // Test 3 normal increments with next-cycle ACK
+            for (i = 0; i < 3; i = i + 1) begin
+                $display("\n--- Cycle %0d ---", i);
+                
+                // Check current address
+                if (ifu_icu_addr_ic1 !== expected_pc) begin
+                    $display("ERROR: Cycle %0d - Expected: 0x%h, Got: 0x%h", 
+                            i, expected_pc, ifu_icu_addr_ic1);
+                    passed = 1'b0;
+                end else begin
+                    $display("OK: Cycle %0d address correct: 0x%h", i, expected_pc);
+                end
+                
+                wait_cycles(5); // long-cycle to simulate icache refill
+                generate_ack();
+                print_realtime_waveform();
+                
+                // Generate data valid
+                generate_data_valid_longcycle();
+                
+                // PC should increment by 8
+                expected_pc = expected_pc + 32'h8;
+                
+                wait_cycles(1);
+            end
+            
+            // Final address check
+            if (ifu_icu_addr_ic1 !== expected_pc) begin
+                $display("ERROR: Final address - Expected: 0x%h, Got: 0x%h", 
+                        expected_pc, ifu_icu_addr_ic1);
+                passed = 1'b0;
+            end else begin
+                $display("OK: Final address correct: 0x%h", expected_pc);
+            end
+            
+            print_test_result("Normal Increment Flow - Next-Cycle ACK", passed);
         end
     endtask
     
