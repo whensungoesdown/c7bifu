@@ -19,6 +19,7 @@ module top_tb();
     // Output signals
     wire [31:0] ifu_icu_addr_ic1;
     wire ifu_icu_req_ic1;
+    wire icu_data_vld;            // NEW: icu_data_vld output signal
     
     // Internal signals from c7bifu
     wire [31:0] pf_addr_q;
@@ -37,23 +38,24 @@ module top_tb();
     
     // Waveform display variables
     integer cycle_count;
-    reg [79:0] wave_clk;
-    reg [79:0] wave_resetn;
-    reg [79:0] wave_req;
-    reg [79:0] wave_ack;          // 添加ACK波形
-    reg [79:0] wave_valid;
-    reg [79:0] wave_except;
-    reg [79:0] wave_branch;
-    reg [79:0] wave_ertn;
-    reg [79:0] wave_pf_init;
-    reg [79:0] wave_pf_old;
-    reg [79:0] wave_pf_inc;
-    reg [79:0] wave_pf_brn;
-    reg [79:0] wave_pf_isr;
-    reg [79:0] wave_pf_ert;
-    reg [79:0] wave_pf_en;
-    reg [79:0] wave_pf_addr_hex;
-    reg [79:0] wave_pf_addr_dec;
+    reg [179:0] wave_clk;
+    reg [179:0] wave_resetn;
+    reg [179:0] wave_req;
+    reg [179:0] wave_ack;          // 添加ACK波形
+    reg [179:0] wave_valid;
+    reg [179:0] wave_data_vld;     // NEW: icu_data_vld waveform
+    reg [179:0] wave_except;
+    reg [179:0] wave_branch;
+    reg [179:0] wave_ertn;
+    reg [179:0] wave_pf_init;
+    reg [179:0] wave_pf_old;
+    reg [179:0] wave_pf_inc;
+    reg [179:0] wave_pf_brn;
+    reg [179:0] wave_pf_isr;
+    reg [179:0] wave_pf_ert;
+    reg [179:0] wave_pf_en;
+    reg [179:0] wave_pf_addr_hex;
+    reg [179:0] wave_pf_addr_dec;
     
     // Clock edge counter
     integer clk_edge_count;
@@ -93,29 +95,30 @@ module top_tb();
     
     // Waveform sampling (sample at clock falling edge)
     always @(negedge clk) begin
-        if (cycle_count < 80) begin
+        if (cycle_count < 180) begin
             // Basic signals
-            wave_clk      <= {wave_clk[78:0], "^"};
-            wave_resetn   <= {wave_resetn[78:0], (resetn ? "-" : "_")};
-            wave_req      <= {wave_req[78:0], (ifu_icu_req_ic1 ? "-" : "_")};
-            wave_ack      <= {wave_ack[78:0], (icu_ifu_ack_ic1 ? "-" : "_")};
-            wave_valid    <= {wave_valid[78:0], (icu_ifu_data_valid_ic2 ? "-" : "_")};
-            wave_except   <= {wave_except[78:0], (exu_ifu_except ? "-" : "_")};
-            wave_branch   <= {wave_branch[78:0], (exu_ifu_branch ? "-" : "_")};
-            wave_ertn     <= {wave_ertn[78:0], (exu_ifu_ertn ? "-" : "_")};
+            wave_clk      <= {wave_clk[178:0], "^"};
+            wave_resetn   <= {wave_resetn[178:0], (resetn ? "-" : "_")};
+            wave_req      <= {wave_req[178:0], (ifu_icu_req_ic1 ? "-" : "_")};
+            wave_ack      <= {wave_ack[178:0], (icu_ifu_ack_ic1 ? "-" : "_")};
+            wave_valid    <= {wave_valid[178:0], (icu_ifu_data_valid_ic2 ? "-" : "_")};
+            wave_data_vld <= {wave_data_vld[178:0], (icu_data_vld ? "-" : "_")}; // NEW: Add icu_data_vld to waveform
+            wave_except   <= {wave_except[178:0], (exu_ifu_except ? "-" : "_")};
+            wave_branch   <= {wave_branch[178:0], (exu_ifu_branch ? "-" : "_")};
+            wave_ertn     <= {wave_ertn[178:0], (exu_ifu_ertn ? "-" : "_")};
             
             // Address selection signals (monitor internal wires)
-            wave_pf_init  <= {wave_pf_init[78:0], (pf_addr_sel_init ? "-" : "_")};
-            wave_pf_old   <= {wave_pf_old[78:0], (pf_addr_sel_old ? "-" : "_")};
-            wave_pf_inc   <= {wave_pf_inc[78:0], (pf_addr_sel_inc ? "-" : "_")};
-            wave_pf_brn   <= {wave_pf_brn[78:0], (pf_addr_sel_brn ? "-" : "_")};
-            wave_pf_isr   <= {wave_pf_isr[78:0], (pf_addr_sel_isr ? "-" : "_")};
-            wave_pf_ert   <= {wave_pf_ert[78:0], (pf_addr_sel_ert ? "-" : "_")};
-            wave_pf_en    <= {wave_pf_en[78:0], (pf_addr_en ? "-" : "_")};
+            wave_pf_init  <= {wave_pf_init[178:0], (pf_addr_sel_init ? "-" : "_")};
+            wave_pf_old   <= {wave_pf_old[178:0], (pf_addr_sel_old ? "-" : "_")};
+            wave_pf_inc   <= {wave_pf_inc[178:0], (pf_addr_sel_inc ? "-" : "_")};
+            wave_pf_brn   <= {wave_pf_brn[178:0], (pf_addr_sel_brn ? "-" : "_")};
+            wave_pf_isr   <= {wave_pf_isr[178:0], (pf_addr_sel_isr ? "-" : "_")};
+            wave_pf_ert   <= {wave_pf_ert[178:0], (pf_addr_sel_ert ? "-" : "_")};
+            wave_pf_en    <= {wave_pf_en[178:0], (pf_addr_en ? "-" : "_")};
             
             // Current PC value in hex and decimal (truncated for display)
-            wave_pf_addr_hex <= {wave_pf_addr_hex[78:0], get_hex_char(pf_addr_q[3:0])};
-            wave_pf_addr_dec <= {wave_pf_addr_dec[78:0], get_dec_char(pf_addr_q % 10)};
+            wave_pf_addr_hex <= {wave_pf_addr_hex[178:0], get_hex_char(pf_addr_q[3:0])};
+            wave_pf_addr_dec <= {wave_pf_addr_dec[178:0], get_dec_char(pf_addr_q % 10)};
             
             cycle_count <= cycle_count + 1;
         end
@@ -219,6 +222,7 @@ module top_tb();
         wave_req = "";
         wave_ack = "";
         wave_valid = "";
+        wave_data_vld = ""; // NEW: Initialize icu_data_vld waveform string
         wave_except = "";
         wave_branch = "";
         wave_ertn = "";
@@ -253,7 +257,8 @@ module top_tb();
         // 中断测试（使用同一周期ACK）
 //        ack_mode = 1'b1;
 //        test_branch_interrupt();
-//        test_exception_interrupt();
+        test_exception_interrupt_no_datacancel();
+        test_exception_interrupt_datacancel();
 //        test_ertn_interrupt();
 //        
 //        test_back_to_back_requests();
@@ -272,9 +277,9 @@ module top_tb();
     // Task: Print realtime waveform
     task automatic print_realtime_waveform;
         begin
-            $display("Time=%t, Clock Edge=%0d | resetn=%b | req=%b | ack=%b | valid=%b | except=%b | branch=%b | ertn=%b",
+            $display("Time=%t, Clock Edge=%0d | resetn=%b | req=%b | ack=%b | valid=%b | data_vld=%b | except=%b | branch=%b | ertn=%b", // MODIFIED: Added data_vld
                      $time, clk_edge_count, resetn, ifu_icu_req_ic1, icu_ifu_ack_ic1,
-                     icu_ifu_data_valid_ic2, exu_ifu_except, exu_ifu_branch, exu_ifu_ertn);
+                     icu_ifu_data_valid_ic2, icu_data_vld, exu_ifu_except, exu_ifu_branch, exu_ifu_ertn); // MODIFIED: Added icu_data_vld
             $display("                    | pf_addr=0x%h | ifu_addr=0x%h", 
                      pf_addr_q, ifu_icu_addr_ic1);
             $display("                    | pf_init=%b | pf_old=%b | pf_inc=%b | pf_brn=%b | pf_isr=%b | pf_ert=%b | pf_en=%b",
@@ -299,6 +304,7 @@ module top_tb();
             wave_req = "";
             wave_ack = "";
             wave_valid = "";
+            wave_data_vld = ""; // NEW: Reset icu_data_vld waveform string
             wave_except = "";
             wave_branch = "";
             wave_ertn = "";
@@ -323,25 +329,26 @@ module top_tb();
             $display("------------------------------------------------");
             
             // Basic control signals
-            $display("clk    : %s", wave_clk);
-            $display("resetn : %s", wave_resetn);
-            $display("req    : %s", wave_req);
-            $display("ack    : %s", wave_ack);
-            $display("valid  : %s", wave_valid);
-            $display("except : %s", wave_except);
-            $display("branch : %s", wave_branch);
-            $display("ertn   : %s", wave_ertn);
+            $display("clk      : %s", wave_clk);
+            $display("resetn   : %s", wave_resetn);
+            $display("req      : %s", wave_req);
+            $display("ack      : %s", wave_ack);
+            $display("valid    : %s", wave_valid);
+            $display("data_vld : %s", wave_data_vld); // NEW: Display icu_data_vld waveform
+            $display("except   : %s", wave_except);
+            $display("branch   : %s", wave_branch);
+            $display("ertn     : %s", wave_ertn);
             $display("------------------------------------------------");
             
             // Address selection signals
             $display("PF Address Selection:");
-            $display("pf_init: %s (select initial address)", wave_pf_init);
-            $display("pf_old : %s (select old/stall address)", wave_pf_old);
-            $display("pf_inc : %s (select increment address)", wave_pf_inc);
-            $display("pf_brn : %s (select branch address)", wave_pf_brn);
-            $display("pf_isr : %s (select exception address)", wave_pf_isr);
-            $display("pf_ert : %s (select ertn address)", wave_pf_ert);
-            $display("pf_en  : %s (address update enable)", wave_pf_en);
+            $display("pf_init  : %s (select initial address)", wave_pf_init);
+            $display("pf_old   : %s (select old/stall address)", wave_pf_old);
+            $display("pf_inc   : %s (select increment address)", wave_pf_inc);
+            $display("pf_brn   : %s (select branch address)", wave_pf_brn);
+            $display("pf_isr   : %s (select exception address)", wave_pf_isr);
+            $display("pf_ert   : %s (select ertn address)", wave_pf_ert);
+            $display("pf_en    : %s (address update enable)", wave_pf_en);
             $display("------------------------------------------------");
             
             // Address value (LSB in hex and decimal)
@@ -856,11 +863,20 @@ module top_tb();
         end
     endtask
     
-    // Test 6: Exception interrupt with same-cycle ACK
-    task automatic test_exception_interrupt;
+    // Test 6: Exception interrupt without data_cancel
+    // # clk      :      ^^^^^^^^^^^^^^^^^^
+    // # resetn   :      _____-------------
+    // # req      :      -_____---__----__-
+    // # ack      :      ________-_____-___
+    // # valid    :      _________-_____-__
+    // # data_vld :      _________-_____-__
+    // # except   :      ____________-_____
+    // # branch   :      __________________
+    // # ertn     :      __________________
+    task automatic test_exception_interrupt_no_datacancel;
         reg passed;
         begin
-            print_test_start("Exception Interrupt - Same-Cycle ACK");
+            print_test_start("Exception Interrupt");
             passed = 1'b1;
             
             // Set ACK mode to same-cycle
@@ -868,8 +884,8 @@ module top_tb();
             
             // Start from known state
             resetn = 1'b0;
-            wait_cycles(1);
-            resetn = 1'b1;
+            wait_cycles(5);
+            #2 resetn = 1'b1;
             wait_cycles(2);
             
             expected_pc = 32'h1c000000;
@@ -902,7 +918,7 @@ module top_tb();
                 $display("OK: Exception handler address correct: 0x1c000100");
             end
             
-            @(posedge clk);
+            //@(posedge clk);
             exu_ifu_except = 1'b0;
             
             // Give same-cycle ACK for exception handler
@@ -915,6 +931,11 @@ module top_tb();
             
             // Simulate data valid for exception handler
             generate_data_valid();
+
+	    if (icu_data_vld !== 1'b1) begin
+                $display("ERROR: icu_data_vld should be 1 after ERTN data valid");
+                passed = 1'b0;
+            end
             
             // Next address should be handler + 8
             expected_pc = 32'h1c000100 + 32'h8;
@@ -932,6 +953,105 @@ module top_tb();
         end
     endtask
     
+    // Test 6.5: Exception interrupt with data_cancel
+    // # clk      : ^^^^^^^^^^^^^^^^^^^^^^
+    // # resetn   : _---------------------
+    // # req      : __---__-___--------__-
+    // # ack      : ____-__-__________-___
+    // # valid    : _____-__________-__-__
+    // # data_vld : _____-_____________-__
+    // # except   : __________-___________
+    // # branch   : ______________________
+    // # ertn     : ______________________
+    task automatic test_exception_interrupt_datacancel;
+        reg passed;
+        begin
+            print_test_start("Exception Interrupt - data_cancel");
+            passed = 1'b1;
+            
+            // Set ACK mode to same-cycle
+            ack_mode = 1'b1;
+            
+            // Start from known state
+            resetn = 1'b0;
+            wait_cycles(5);
+            #2 resetn = 1'b1;
+            wait_cycles(2);
+            
+            expected_pc = 32'h1c000000;
+            
+            // Get one normal increment first with same-cycle ACK
+            wait_cycles(1);
+            if (ifu_icu_req_ic1 == 1'b1) begin
+                icu_ifu_ack_ic1 = 1'b1;
+                @(posedge clk);
+                icu_ifu_ack_ic1 = 1'b0;
+            end
+            
+            generate_data_valid();
+
+            @(posedge clk);
+
+            expected_pc = expected_pc + 32'h8;
+            icu_ifu_ack_ic1 = 1'b1; // next ack, same cycle
+            @(posedge clk);
+            icu_ifu_ack_ic1 = 1'b0; // next ack, same cycle
+
+            wait_cycles(2);
+            
+            // Trigger exception
+            exu_ifu_except = 1'b1;
+            exu_ifu_isr_addr = 32'h1c000100; // Exception handler
+            
+            @(posedge clk);
+            print_realtime_waveform();
+            //@(posedge clk);
+            exu_ifu_except = 1'b0;
+
+	    // data_valid for the previous 0x1c000008
+            generate_data_valid_longcycle();
+
+	    if (icu_data_vld === 1'b1) begin
+                $display("ERROR: icu_data_vld should not be 1 because data for 0x1c000008 is canceled");
+                passed = 1'b0;
+            end
+            
+            
+            // Give ACK for the exception request
+            wait_cycles(1);
+            if (ifu_icu_req_ic1 == 1'b1) begin
+                icu_ifu_ack_ic1 = 1'b1;
+                @(posedge clk);
+                icu_ifu_ack_ic1 = 1'b0;
+            end
+            
+            // Simulate data valid for exception handler
+            generate_data_valid();
+
+	    if (icu_data_vld !== 1'b1) begin
+                $display("ERROR: icu_data_vld should be 1 after data valid");
+                passed = 1'b0;
+	    end else begin
+                $display("OK: icu_data_vld is 1 after data valid for 0x1c000100");
+                passed = 1'b1;
+	    end
+            
+            // Next address should be handler + 8
+            expected_pc = 32'h1c000100 + 32'h8;
+            wait_cycles(2);
+            
+            if (ifu_icu_addr_ic1 !== expected_pc) begin
+                $display("ERROR: Address after exception - Expected: 0x%h, Got: 0x%h", 
+                        expected_pc, ifu_icu_addr_ic1);
+                passed = 1'b0;
+            end else begin
+                $display("OK: Address after exception correct: 0x%h", expected_pc);
+            end
+            
+            print_test_result("Exception Interrupt - data_cancel", passed);
+        end
+    endtask
+
     // Test 7: ERTN interrupt with same-cycle ACK
     task automatic test_ertn_interrupt;
         reg passed;
@@ -1075,9 +1195,9 @@ module top_tb();
         forever begin
             @(posedge clk);
             $display("Time=%t | clk_edge=%0d", $time, clk_edge_count);
-            $display("  Control: resetn=%b, req=%b, ack=%b, valid=%b, except=%b, branch=%b, ertn=%b",
+            $display("  Control: resetn=%b, req=%b, ack=%b, valid=%b, data_vld=%b, except=%b, branch=%b, ertn=%b", // MODIFIED: Added data_vld
                      resetn, ifu_icu_req_ic1, icu_ifu_ack_ic1,
-                     icu_ifu_data_valid_ic2, exu_ifu_except, exu_ifu_branch, exu_ifu_ertn);
+                     icu_ifu_data_valid_ic2, icu_data_vld, exu_ifu_except, exu_ifu_branch, exu_ifu_ertn); // MODIFIED: Added icu_data_vld
             $display("  Address: pf_addr=0x%h, ifu_addr=0x%h", 
                      pf_addr_q, ifu_icu_addr_ic1);
         end
@@ -1139,5 +1259,6 @@ module top_tb();
     assign pf_addr_sel_isr = dut.pf_addr_sel_isr;
     assign pf_addr_sel_ert = dut.pf_addr_sel_ert;
     assign pf_addr_en = dut.pf_addr_en;
+    assign icu_data_vld = dut.icu_data_vld; // NEW: Connect icu_data_vld signal from DUT
 
 endmodule

@@ -29,6 +29,7 @@ module c7bifu (
    wire pf_addr_sel_ert;
 
    wire pf_addr_en;
+   wire icu_data_vld;
 
    
    c7bifu_fcl u_fcl (
@@ -46,7 +47,8 @@ module c7bifu (
       .pf_addr_sel_brn                 (pf_addr_sel_brn),
       .pf_addr_sel_isr                 (pf_addr_sel_isr),
       .pf_addr_sel_ert                 (pf_addr_sel_ert),
-      .pf_addr_en                      (pf_addr_en)
+      .pf_addr_en                      (pf_addr_en),
+      .icu_data_vld                    (icu_data_vld)
    );
 
    assign pf_addr_inc = pf_addr_q + 4'h8;

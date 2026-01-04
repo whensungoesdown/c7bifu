@@ -7,6 +7,11 @@ add wave -position end  result:/top_tb/dut/ifu_icu_addr_ic1
 add wave -position end  result:/top_tb/dut/ifu_icu_req_ic1
 add wave -position end  result:/top_tb/dut/icu_ifu_ack_ic1
 add wave -position end  result:/top_tb/dut/icu_ifu_data_valid_ic2
+add wave -position end  result:/top_tb/dut/u_fcl/icu_data_vld
+add wave -divider
+add wave -position end  result:/top_tb/dut/u_fcl/data_cancel_en
+add wave -position end  result:/top_tb/dut/u_fcl/data_cancel_in
+add wave -position end  result:/top_tb/dut/u_fcl/data_cancel_q
 add wave -divider
 add wave -position end  result:/top_tb/dut/pf_addr_inc
 add wave -position end  result:/top_tb/dut/pf_addr_en
@@ -34,3 +39,8 @@ add wave -position end  result:/top_tb/dut/u_fcl/stall_pf
 add wave -position end  result:/top_tb/dut/u_fcl/addr_stall
 add wave -position end  result:/top_tb/dut/u_fcl/stall_f
 add wave -position end  result:/top_tb/dut/u_fcl/data_stall
+add wave -divider
+add wave -position end  result:/top_tb/dut/exu_ifu_isr_addr
+add wave -position end  result:/top_tb/dut/u_fcl/flush
+add wave -position end  result:/top_tb/dut/u_fcl/stall_f
+add wave -position end  result:/top_tb/dut/u_fcl/stall_pf

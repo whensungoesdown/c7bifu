@@ -15,7 +15,8 @@ module c7bifu_fcl (
    output             pf_addr_sel_isr,
    output             pf_addr_sel_ert,
 
-   output             pf_addr_en
+   output             pf_addr_en,
+   output             icu_data_vld
 );
 
    // Pipeline, pf (pre-fetch) and f (fetch)
@@ -40,6 +41,9 @@ module c7bifu_fcl (
    wire except;
    wire branch;
    wire ertn;
+
+   wire data_cancel_in;
+   wire data_cancel_q;
 
 
    // Synchronizes resetn to clock domain, active for one cycle after resetn
@@ -89,9 +93,10 @@ module c7bifu_fcl (
    // Fix: Keep stall_pf asserted during entire reset period
    //      Ensures 0x1C000000 is properly registered before any increment
 
-   assign icu_req = ~icu_req_q
+   assign icu_req = ( ~icu_req_q
 		  //& ~d_stall_in
-		  & ~d_stall_q
+		  & ~d_stall_q )
+		  | except
 		  ; //& resetn_sync_q;
 
    assign icu_req_in = (icu_req_q & ~icu_ifu_ack_ic1) | icu_req;
@@ -132,7 +137,7 @@ module c7bifu_fcl (
 
    // addrs do not need a flush
    assign pf_addr_sel_init = ~resetn_sync_q;
-   assign pf_addr_sel_old = stall_pf & ~pf_addr_sel_init;
+   assign pf_addr_sel_old = stall_pf & ~pf_addr_sel_init & ~pf_addr_sel_brn & ~pf_addr_sel_isr & ~pf_addr_sel_ert;
    assign pf_addr_sel_inc = ~stall_pf & ~except & ~branch & ~pf_addr_sel_init;
 
    // addrs need flush
@@ -140,7 +145,24 @@ module c7bifu_fcl (
    assign pf_addr_sel_isr = except;
    assign pf_addr_sel_ert = ertn;
 
-   assign pf_addr_en = ~stall_pf;
+   assign pf_addr_en = ~stall_pf | except;
+
+
+   //
+   // data_cancel
+   //
+   // When an exception occurs during a data stall (data_stall == 1), set
+   // data_cancel_q to 1.
+   // This flag will cancel the next arriving icu_ifu_data_valid_ic2 signal,
+   // preventing invalid instruction data from being processed.
+   //
+   // Note: icu_ifu_data_valid_ic2 clears data_cancel_q when it arrives.
+   // If except and icu_ifu_data_valid_ic2 occur in the same cycle,
+   // data_cancel_q will NOT be set.
+   assign data_cancel_in = (data_stall & except) & ~icu_ifu_data_valid_ic2;
+   assign data_cancel_en = except | icu_ifu_data_valid_ic2;
+
+   assign icu_data_vld = icu_ifu_data_valid_ic2 & ~data_cancel_q;
 
 
    //
@@ -152,5 +174,12 @@ module c7bifu_fcl (
       .clk (clk),
       .rst_l (resetn),
       .q   (resetn_sync_q));
+
+   dffrle_ns #(1) data_cancel_reg (
+      .din (data_cancel_in),
+      .clk (clk),
+      .rst_l (resetn),
+      .en (data_cancel_en),
+      .q   (data_cancel_q));
 
 endmodule

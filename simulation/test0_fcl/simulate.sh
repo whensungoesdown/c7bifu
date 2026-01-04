@@ -69,9 +69,9 @@ echo "PROJECT_ROOT set to: $PROJECT_ROOT"
 
 ./clean.sh > /dev/null
 
-//cd testcode
-//make
-//cd ..
+#cd testcode
+#make
+#cd ..
 
 vlib work
 vmap work work

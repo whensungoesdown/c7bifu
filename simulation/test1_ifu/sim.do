@@ -14,7 +14,7 @@ add wave -position end  sim:/top_tb/resetn
 
 
 
-run 1000ns
+run 10000ns
 
 # read in stimulus
 #do stim.do
