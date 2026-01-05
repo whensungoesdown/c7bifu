@@ -58,7 +58,6 @@ module c7bifu_fcl (
 
 
    assign flush = except | branch | ertn;
-   //assign flush = 1'b0;
 
    assign addr_stall = icu_req_q; 
 
@@ -96,7 +95,7 @@ module c7bifu_fcl (
    assign icu_req = ( ~icu_req_q
 		  //& ~d_stall_in
 		  & ~d_stall_q )
-		  | except
+		  | flush
 		  ; //& resetn_sync_q;
 
    assign icu_req_in = (icu_req_q & ~icu_ifu_ack_ic1) | icu_req;
@@ -138,14 +137,14 @@ module c7bifu_fcl (
    // addrs do not need a flush
    assign pf_addr_sel_init = ~resetn_sync_q;
    assign pf_addr_sel_old = stall_pf & ~pf_addr_sel_init & ~pf_addr_sel_brn & ~pf_addr_sel_isr & ~pf_addr_sel_ert;
-   assign pf_addr_sel_inc = ~stall_pf & ~except & ~branch & ~pf_addr_sel_init;
+   assign pf_addr_sel_inc = ~stall_pf & ~flush & ~pf_addr_sel_init;
 
    // addrs need flush
-   assign pf_addr_sel_brn = ~except & branch;
+   assign pf_addr_sel_brn = branch;
    assign pf_addr_sel_isr = except;
    assign pf_addr_sel_ert = ertn;
 
-   assign pf_addr_en = ~stall_pf | except;
+   assign pf_addr_en = ~stall_pf | flush;
 
 
    //
@@ -159,8 +158,9 @@ module c7bifu_fcl (
    // Note: icu_ifu_data_valid_ic2 clears data_cancel_q when it arrives.
    // If except and icu_ifu_data_valid_ic2 occur in the same cycle,
    // data_cancel_q will NOT be set.
-   assign data_cancel_in = (data_stall & except) & ~icu_ifu_data_valid_ic2;
-   assign data_cancel_en = except | icu_ifu_data_valid_ic2;
+   //assign data_cancel_in = (data_stall & except) & ~icu_ifu_data_valid_ic2;
+   assign data_cancel_in = (data_stall & flush) & ~icu_ifu_data_valid_ic2;
+   assign data_cancel_en = flush | icu_ifu_data_valid_ic2;
 
    assign icu_data_vld = icu_ifu_data_valid_ic2 & ~data_cancel_q;
 

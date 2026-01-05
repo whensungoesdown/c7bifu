@@ -294,7 +294,7 @@ module top_tb();
 
     // Task: Print test result
     task print_test_result;
-        input [80:0] test_name;
+        input [700:0] test_name;
         input passed;
         begin
             // Print waveform with all signals

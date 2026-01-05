@@ -257,9 +257,16 @@ module top_tb();
         // 中断测试（使用同一周期ACK）
 //        ack_mode = 1'b1;
 //        test_branch_interrupt();
+
         test_exception_interrupt_no_datacancel();
         test_exception_interrupt_datacancel();
-//        test_ertn_interrupt();
+
+        test_branch_no_datacancel();
+        test_branch_datacancel();
+
+        test_ertn_no_datacancel();
+        test_ertn_datacancel();
+
 //        
 //        test_back_to_back_requests();
 
@@ -360,7 +367,7 @@ module top_tb();
 
     // Task: Print test result
     task automatic print_test_result;
-        input [80:0] test_name;
+        input [512:0] test_name;
         input passed;
         begin
             // Print waveform with all signals
@@ -1052,11 +1059,20 @@ module top_tb();
         end
     endtask
 
-    // Test 7: ERTN interrupt with same-cycle ACK
-    task automatic test_ertn_interrupt;
+    // Test 7: Branch without data_cancel
+    // # clk      :      ^^^^^^^^^^^^^^^^^^
+    // # resetn   :      _____-------------
+    // # req      :      -_____---__----__-
+    // # ack      :      ________-_____-___
+    // # valid    :      _________-_____-__
+    // # data_vld :      _________-_____-__
+    // # except   :      __________________
+    // # branch   :      ____________-_____
+    // # ertn     :      __________________
+    task automatic test_branch_no_datacancel;
         reg passed;
         begin
-            print_test_start("ERTN Interrupt - Same-Cycle ACK");
+            print_test_start("Branch");
             passed = 1'b1;
             
             // Set ACK mode to same-cycle
@@ -1064,8 +1080,8 @@ module top_tb();
             
             // Start from known state
             resetn = 1'b0;
-            wait_cycles(1);
-            resetn = 1'b1;
+            wait_cycles(5);
+            #2 resetn = 1'b1;
             wait_cycles(2);
             
             expected_pc = 32'h1c000000;
@@ -1082,26 +1098,26 @@ module top_tb();
             expected_pc = expected_pc + 32'h8;
             wait_cycles(2);
             
-            // Trigger ERTN return
-            exu_ifu_ertn = 1'b1;
-            exu_ifu_ert_addr = 32'h1c000200; // Return address
+            // Trigger branch
+            exu_ifu_branch = 1'b1;
+            exu_ifu_brn_addr = 32'h1c000200; // Branch-to address
             
             @(posedge clk);
             print_realtime_waveform();
             
-            // Check ERTN address is selected
+            // Check branch address is selected
             if (ifu_icu_addr_ic1 !== 32'h1c000200) begin
-                $display("ERROR: ERTN return address - Expected: 0x1c000200, Got: 0x%h", 
+                $display("ERROR: Branch address - Expected: 0x1c000200, Got: 0x%h", 
                         ifu_icu_addr_ic1);
                 passed = 1'b0;
             end else begin
-                $display("OK: ERTN return address correct: 0x1c000200");
+                $display("OK: Branch address correct: 0x1c000200");
             end
             
-            @(posedge clk);
-            exu_ifu_ertn = 1'b0;
+            //@(posedge clk);
+            exu_ifu_branch = 1'b0;
             
-            // Give same-cycle ACK for return address
+            // Give same-cycle ACK for branch address
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -1109,25 +1125,318 @@ module top_tb();
                 icu_ifu_ack_ic1 = 1'b0;
             end
             
-            // Simulate data valid for return address
+            // Simulate data valid for branch address
             generate_data_valid();
+
+	    if (icu_data_vld !== 1'b1) begin
+                $display("ERROR: icu_data_vld should be 1 after branch address data valid");
+                passed = 1'b0;
+            end
             
-            // Next address should be return address + 8
+            // Next address should be handler + 8
             expected_pc = 32'h1c000200 + 32'h8;
             wait_cycles(2);
             
             if (ifu_icu_addr_ic1 !== expected_pc) begin
-                $display("ERROR: Address after ERTN - Expected: 0x%h, Got: 0x%h", 
+                $display("ERROR: Address after branch - Expected: 0x%h, Got: 0x%h", 
                         expected_pc, ifu_icu_addr_ic1);
                 passed = 1'b0;
             end else begin
-                $display("OK: Address after ERTN correct: 0x%h", expected_pc);
+                $display("OK: Address after branch correct: 0x%h", expected_pc);
             end
             
-            print_test_result("ERTN Interrupt - Same-Cycle ACK", passed);
+            print_test_result("Branch - no data_cancel", passed);
         end
     endtask
     
+    // Test 7.5: Branch with data_cancel
+    // # clk      : ^^^^^^^^^^^^^^^^^^^^^^
+    // # resetn   : _---------------------
+    // # req      : __---__-___--------__-
+    // # ack      : ____-__-__________-___
+    // # valid    : _____-__________-__-__
+    // # data_vld : _____-_____________-__
+    // # except   : ______________________
+    // # branch   : __________-___________
+    // # ertn     : ______________________
+    task automatic test_branch_datacancel;
+        reg passed;
+        begin
+            print_test_start("Branch - data_cancel");
+            passed = 1'b1;
+            
+            // Set ACK mode to same-cycle
+            ack_mode = 1'b1;
+            
+            // Start from known state
+            resetn = 1'b0;
+            wait_cycles(5);
+            #2 resetn = 1'b1;
+            wait_cycles(2);
+            
+            expected_pc = 32'h1c000000;
+            
+            // Get one normal increment first with same-cycle ACK
+            wait_cycles(1);
+            if (ifu_icu_req_ic1 == 1'b1) begin
+                icu_ifu_ack_ic1 = 1'b1;
+                @(posedge clk);
+                icu_ifu_ack_ic1 = 1'b0;
+            end
+            
+            generate_data_valid();
+
+            @(posedge clk);
+
+            expected_pc = expected_pc + 32'h8;
+            icu_ifu_ack_ic1 = 1'b1; // next ack, same cycle
+            @(posedge clk);
+            icu_ifu_ack_ic1 = 1'b0; // next ack, same cycle
+
+            wait_cycles(2);
+            
+            // Trigger branch
+            exu_ifu_branch = 1'b1;
+            exu_ifu_brn_addr = 32'h1c000200; // Branch address
+            
+            @(posedge clk);
+            print_realtime_waveform();
+            //@(posedge clk);
+            exu_ifu_branch = 1'b0;
+
+	    // data_valid for the previous 0x1c000008
+            generate_data_valid_longcycle();
+
+	    if (icu_data_vld === 1'b1) begin
+                $display("ERROR: icu_data_vld should not be 1 because data for 0x1c000008 is canceled");
+                passed = 1'b0;
+            end
+            
+            
+            // Give ACK for the branch request
+            wait_cycles(1);
+            if (ifu_icu_req_ic1 == 1'b1) begin
+                icu_ifu_ack_ic1 = 1'b1;
+                @(posedge clk);
+                icu_ifu_ack_ic1 = 1'b0;
+            end
+            
+            // Simulate data valid for branch fetch data
+            generate_data_valid();
+
+	    if (icu_data_vld !== 1'b1) begin
+                $display("ERROR: icu_data_vld should be 1 after data valid");
+                passed = 1'b0;
+	    end else begin
+                $display("OK: icu_data_vld is 1 after data valid for 0x1c000200");
+                passed = 1'b1;
+	    end
+            
+            // Next address should be handler + 8
+            expected_pc = 32'h1c000200 + 32'h8;
+            wait_cycles(2);
+            
+            if (ifu_icu_addr_ic1 !== expected_pc) begin
+                $display("ERROR: Address after branch - Expected: 0x%h, Got: 0x%h", 
+                        expected_pc, ifu_icu_addr_ic1);
+                passed = 1'b0;
+            end else begin
+                $display("OK: Address after branch correct: 0x%h", expected_pc);
+            end
+            
+            print_test_result("Branch - data_cancel", passed);
+        end
+    endtask
+
+    // Test 8: ertn without data_cancel
+    // # clk      :      ^^^^^^^^^^^^^^^^^^
+    // # resetn   :      _____-------------
+    // # req      :      -_____---__----__-
+    // # ack      :      ________-_____-___
+    // # valid    :      _________-_____-__
+    // # data_vld :      _________-_____-__
+    // # except   :      __________________
+    // # branch   :      __________________
+    // # ertn     :      ____________-_____
+    task automatic test_ertn_no_datacancel;
+        reg passed;
+        begin
+            print_test_start("ertn without data_cancel");
+            passed = 1'b1;
+            
+            // Set ACK mode to same-cycle
+            ack_mode = 1'b1;
+            
+            // Start from known state
+            resetn = 1'b0;
+            wait_cycles(5);
+            #2 resetn = 1'b1;
+            wait_cycles(2);
+            
+            expected_pc = 32'h1c000000;
+            
+            // Get one normal increment first with same-cycle ACK
+            wait_cycles(1);
+            if (ifu_icu_req_ic1 == 1'b1) begin
+                icu_ifu_ack_ic1 = 1'b1;
+                @(posedge clk);
+                icu_ifu_ack_ic1 = 1'b0;
+            end
+            
+            generate_data_valid();
+            expected_pc = expected_pc + 32'h8;
+            wait_cycles(2);
+            
+            // Trigger ertn
+            exu_ifu_ertn = 1'b1;
+            exu_ifu_ert_addr = 32'h1c000300; // ertn address
+            
+            @(posedge clk);
+            print_realtime_waveform();
+            
+            // Check ertn address is selected
+            if (ifu_icu_addr_ic1 !== 32'h1c000300) begin
+                $display("ERROR: ertn address - Expected: 0x1c000300, Got: 0x%h", 
+                        ifu_icu_addr_ic1);
+                passed = 1'b0;
+            end else begin
+                $display("OK: ertn address correct: 0x1c000300");
+            end
+            
+            //@(posedge clk);
+            exu_ifu_ertn = 1'b0;
+            
+            // Give same-cycle ACK for ertn address
+            wait_cycles(1);
+            if (ifu_icu_req_ic1 == 1'b1) begin
+                icu_ifu_ack_ic1 = 1'b1;
+                @(posedge clk);
+                icu_ifu_ack_ic1 = 1'b0;
+            end
+            
+            // Simulate data valid for ertn address
+            generate_data_valid();
+
+	    if (icu_data_vld !== 1'b1) begin
+                $display("ERROR: icu_data_vld should be 1 after ertn address data valid");
+                passed = 1'b0;
+            end
+            
+            // Next address should be handler + 8
+            expected_pc = 32'h1c000300 + 32'h8;
+            wait_cycles(2);
+            
+            if (ifu_icu_addr_ic1 !== expected_pc) begin
+                $display("ERROR: Address after ertn - Expected: 0x%h, Got: 0x%h", 
+                        expected_pc, ifu_icu_addr_ic1);
+                passed = 1'b0;
+            end else begin
+                $display("OK: Address after ertn correct: 0x%h", expected_pc);
+            end
+            
+            print_test_result("Branch - no data_cancel", passed);
+        end
+    endtask
+    
+    // Test 8.5: ertn with data_cancel
+    // # clk      : ^^^^^^^^^^^^^^^^^^^^^^
+    // # resetn   : _---------------------
+    // # req      : __---__-___--------__-
+    // # ack      : ____-__-__________-___
+    // # valid    : _____-__________-__-__
+    // # data_vld : _____-_____________-__
+    // # except   : ______________________
+    // # branch   : ______________________
+    // # ertn     : __________-___________
+    task automatic test_ertn_datacancel;
+        reg passed;
+        begin
+            print_test_start("ertn with data_cancel");
+            passed = 1'b1;
+            
+            // Set ACK mode to same-cycle
+            ack_mode = 1'b1;
+            
+            // Start from known state
+            resetn = 1'b0;
+            wait_cycles(5);
+            #2 resetn = 1'b1;
+            wait_cycles(2);
+            
+            expected_pc = 32'h1c000000;
+            
+            // Get one normal increment first with same-cycle ACK
+            wait_cycles(1);
+            if (ifu_icu_req_ic1 == 1'b1) begin
+                icu_ifu_ack_ic1 = 1'b1;
+                @(posedge clk);
+                icu_ifu_ack_ic1 = 1'b0;
+            end
+            
+            generate_data_valid();
+
+            @(posedge clk);
+
+            expected_pc = expected_pc + 32'h8;
+            icu_ifu_ack_ic1 = 1'b1; // next ack, same cycle
+            @(posedge clk);
+            icu_ifu_ack_ic1 = 1'b0; // next ack, same cycle
+
+            wait_cycles(2);
+            
+            // Trigger ertn
+            exu_ifu_ertn = 1'b1;
+            exu_ifu_ert_addr = 32'h1c000300; // ertn address
+            
+            @(posedge clk);
+            print_realtime_waveform();
+            //@(posedge clk);
+            exu_ifu_ertn = 1'b0;
+
+	    // data_valid for the previous 0x1c000008
+            generate_data_valid_longcycle();
+
+	    if (icu_data_vld === 1'b1) begin
+                $display("ERROR: icu_data_vld should not be 1 because data for 0x1c000008 is canceled");
+                passed = 1'b0;
+            end
+            
+            
+            // Give ACK for the ertn request
+            wait_cycles(1);
+            if (ifu_icu_req_ic1 == 1'b1) begin
+                icu_ifu_ack_ic1 = 1'b1;
+                @(posedge clk);
+                icu_ifu_ack_ic1 = 1'b0;
+            end
+            
+            // Simulate data valid for ertn fetch data
+            generate_data_valid();
+
+	    if (icu_data_vld !== 1'b1) begin
+                $display("ERROR: icu_data_vld should be 1 after data valid");
+                passed = 1'b0;
+	    end else begin
+                $display("OK: icu_data_vld is 1 after data valid for 0x1c000300");
+                passed = 1'b1;
+	    end
+            
+            // Next address should be handler + 8
+            expected_pc = 32'h1c000300 + 32'h8;
+            wait_cycles(2);
+            
+            if (ifu_icu_addr_ic1 !== expected_pc) begin
+                $display("ERROR: Address after ertn - Expected: 0x%h, Got: 0x%h", 
+                        expected_pc, ifu_icu_addr_ic1);
+                passed = 1'b0;
+            end else begin
+                $display("OK: Address after ertn correct: 0x%h", expected_pc);
+            end
+            
+            print_test_result("ertn with data_cancel", passed);
+        end
+    endtask
+
     // Test 8: Back-to-back requests with same-cycle ACK
     task automatic test_back_to_back_requests;
         reg passed;
