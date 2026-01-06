@@ -6,6 +6,7 @@ module c7bifu (
    output             ifu_icu_req_ic1,
    input              icu_ifu_ack_ic1,
    input              icu_ifu_data_valid_ic2,
+   input  [63:0]      icu_ifu_data_ic2,
    input              exu_ifu_except,
    input  [31:0]      exu_ifu_isr_addr,
    input              exu_ifu_branch,

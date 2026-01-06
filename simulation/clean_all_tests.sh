@@ -16,3 +16,8 @@ echo ""
 cd ..
 
 
+cd test2_iq
+echo "test2_iq"
+./clean.sh
+echo ""
+cd ..

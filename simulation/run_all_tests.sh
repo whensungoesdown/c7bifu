@@ -26,3 +26,13 @@ echo ""
 cd ..
 
 
+cd test2_iq
+echo "test2_iq"
+if ./simulate.sh | grep PASS; then
+	printf ""
+else
+	printf "Fail!\n"
+	exit
+fi
+echo ""
+cd ..
