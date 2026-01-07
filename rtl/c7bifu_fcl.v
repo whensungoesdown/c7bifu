@@ -7,6 +7,7 @@ module c7bifu_fcl (
    input              exu_ifu_except,
    input              exu_ifu_branch,
    input              exu_ifu_ertn,
+   input              exu_ifu_stall,
 
    output             pf_addr_sel_init,
    output             pf_addr_sel_old,
@@ -16,7 +17,11 @@ module c7bifu_fcl (
    output             pf_addr_sel_ert,
 
    output             pf_addr_en,
-   output             icu_data_vld
+   output             icu_data_vld,
+
+   output             stall,
+   output             flush,
+   input              iq_full
 );
 
    // Pipeline, pf (pre-fetch) and f (fetch)
@@ -29,7 +34,7 @@ module c7bifu_fcl (
    wire stall_pf;
    wire stall_f;
 
-   wire flush;
+   //wire flush;
 
    wire icu_req;
    wire icu_req_in;
@@ -91,12 +96,10 @@ module c7bifu_fcl (
    //
    // Fix: Keep stall_pf asserted during entire reset period
    //      Ensures 0x1C000000 is properly registered before any increment
-
-   assign icu_req = ( ~icu_req_q
-		  //& ~d_stall_in
-		  & ~d_stall_q )
-		  | flush
-		  ; //& resetn_sync_q;
+                                //& ~d_stall_in
+   assign icu_req = (( ~icu_req_q & ~d_stall_q) | flush)
+		    & ~iq_full
+		    ; //& resetn_sync_q;
 
    assign icu_req_in = (icu_req_q & ~icu_ifu_ack_ic1) | icu_req;
 
@@ -163,6 +166,8 @@ module c7bifu_fcl (
    assign data_cancel_en = flush | icu_ifu_data_valid_ic2;
 
    assign icu_data_vld = icu_ifu_data_valid_ic2 & ~data_cancel_q;
+
+   assign stall = exu_ifu_stall;
 
 
    //

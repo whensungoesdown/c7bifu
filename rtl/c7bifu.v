@@ -12,7 +12,8 @@ module c7bifu (
    input              exu_ifu_branch,
    input  [31:0]      exu_ifu_brn_addr,
    input              exu_ifu_ertn,
-   input  [31:0]      exu_ifu_ert_addr
+   input  [31:0]      exu_ifu_ert_addr,
+   input              exu_ifu_stall
 );
 
    wire [31:0] pf_addr_in;
@@ -32,6 +33,14 @@ module c7bifu (
    wire pf_addr_en;
    wire icu_data_vld;
 
+   wire [31:0] inst_addr_f;
+   wire [31:0] inst_f;
+   wire        inst_vld_f;
+
+   wire stall;
+   wire flush;
+   wire iq_full;
+
    
    c7bifu_fcl u_fcl (
       .clk                             (clk),
@@ -42,6 +51,7 @@ module c7bifu (
       .exu_ifu_except                  (exu_ifu_except),
       .exu_ifu_branch                  (exu_ifu_branch),
       .exu_ifu_ertn                    (exu_ifu_ertn),
+      .exu_ifu_stall                   (exu_ifu_stall),
       .pf_addr_sel_init                (pf_addr_sel_init),
       .pf_addr_sel_old                 (pf_addr_sel_old),
       .pf_addr_sel_inc                 (pf_addr_sel_inc),
@@ -49,7 +59,10 @@ module c7bifu (
       .pf_addr_sel_isr                 (pf_addr_sel_isr),
       .pf_addr_sel_ert                 (pf_addr_sel_ert),
       .pf_addr_en                      (pf_addr_en),
-      .icu_data_vld                    (icu_data_vld)
+      .icu_data_vld                    (icu_data_vld),
+      .stall                           (stall),
+      .flush                           (flush),
+      .iq_full                         (iq_full)
    );
 
    assign pf_addr_inc = pf_addr_q + 4'h8;
@@ -60,7 +73,23 @@ module c7bifu (
                        {32{pf_addr_sel_brn}}  & exu_ifu_brn_addr |
                        {32{pf_addr_sel_isr}}  & exu_ifu_isr_addr |
                        {32{pf_addr_sel_ert}}  & exu_ifu_ert_addr;		      
+
    assign ifu_icu_addr_ic1 = pf_addr_in;
+
+
+   c7bifu_iq u_iq (
+      .clk                             (clk),
+      .resetn                          (resetn),
+      .data_addr                       (ifu_icu_addr_ic1),
+      .data                            (icu_ifu_data_ic2),
+      .data_vld                        (icu_data_vld),
+      .stall                           (stall),
+      .flush                           (flush),
+      .iq_full                         (iq_full),
+      .inst_addr                       (inst_addr_f),
+      .inst                            (inst_f),
+      .inst_vld                        (inst_vld_f)
+   );
 
 
    //

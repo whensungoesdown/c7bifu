@@ -20,6 +20,9 @@ module top_tb();
     wire pf_addr_sel_isr;   // New output: PC address select exception/isr
     wire pf_addr_sel_ert;   // New output: PC address select ertn return
     wire pf_addr_en;        // New output: PC address enable
+    wire stall;
+    wire flush;
+    wire iq_full;
 
     // Test status variables
     reg [7:0] test_passed;
@@ -47,6 +50,9 @@ module top_tb();
     // Clock edge counter
     integer clk_edge_count;
 
+    // Only test part of fcl logic alone
+    assign iq_full = 1'b0;
+
     // Instantiate DUT
     c7bifu_fcl uut (
         .clk(clk),
@@ -63,7 +69,10 @@ module top_tb();
         .pf_addr_sel_brn(pf_addr_sel_brn),
         .pf_addr_sel_isr(pf_addr_sel_isr),
         .pf_addr_sel_ert(pf_addr_sel_ert),
-        .pf_addr_en(pf_addr_en)
+        .pf_addr_en(pf_addr_en),
+	.stall(stall),
+	.flush(flush),
+	.iq_full(iq_full)
     );
 
     // Clock generation: period 10ns
