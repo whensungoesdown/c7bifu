@@ -7,8 +7,8 @@ module c7bifu_iq (
     input              stall,
     input              flush,
     output             iq_full,
-    output [31:0]      inst_addr_f,
-    output [31:0]      inst_f,
+    output [31:0]      inst_addr,
+    output [31:0]      inst,
     output             inst_vld
 );
 
@@ -120,9 +120,9 @@ end
 // ================= Data Read Logic =================
 // Combinational output: zero-latency read
 // When rd_en is asserted, the output becomes valid immediately in the same cycle
-assign inst_addr_f = queue_addr[rd_ptr_idx];  // Instruction address output
-assign inst_f = queue_data[rd_ptr_idx];       // Instruction data output
-assign inst_vld = rd_en;                      // Output valid when read is enabled
+assign inst_addr = queue_addr[rd_ptr_idx];  // Instruction address output
+assign inst = queue_data[rd_ptr_idx];       // Instruction data output
+assign inst_vld = rd_en;                    // Output valid when read is enabled
 // Or equivalently:
 // assign inst_vld = (!stall && !queue_empty);
 

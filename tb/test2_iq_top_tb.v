@@ -25,8 +25,8 @@ reg         data_vld;
 reg         stall;
 reg         flush;
 wire        iq_full;
-wire [31:0] inst_addr_f;
-wire [31:0] inst_f;
+wire [31:0] inst_addr;
+wire [31:0] inst;
 wire        inst_vld;
 
 // ================= Instantiate DUT =================
@@ -39,8 +39,8 @@ c7bifu_iq dut (
     .stall       (stall),
     .flush       (flush),
     .iq_full     (iq_full),
-    .inst_addr_f (inst_addr_f),
-    .inst_f      (inst_f),
+    .inst_addr   (inst_addr),
+    .inst        (inst),
     .inst_vld    (inst_vld)
 );
 
@@ -159,7 +159,7 @@ task read_instructions;
             
             if (inst_vld) begin
                 $display("  Cycle %0d: Read Addr=0x%08h, Inst=0x%08h", 
-                         i, inst_addr_f, inst_f);
+                         i, inst_addr, inst);
                 instructions_read = instructions_read + 1;
             end
             i = i + 1;
@@ -369,7 +369,7 @@ task test_concurrent_operations;
                 while (i < 10) begin
                     @(posedge clk);
                     if (inst_vld) begin
-                        $display("    Read cycle %0d: Addr=0x%08h", i, inst_addr_f);
+                        $display("    Read cycle %0d: Addr=0x%08h", i, inst_addr);
                     end
                     i = i + 1;
                 end
