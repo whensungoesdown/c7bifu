@@ -36,3 +36,15 @@ else
 fi
 echo ""
 cd ..
+
+
+cd test3_ifu_dataflow
+echo "test3_ifu_dataflow"
+if ./simulate.sh | grep PASS; then
+	printf ""
+else
+	printf "Fail!\n"
+	exit
+fi
+echo ""
+cd ..

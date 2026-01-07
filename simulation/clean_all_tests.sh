@@ -21,3 +21,10 @@ echo "test2_iq"
 ./clean.sh
 echo ""
 cd ..
+
+
+cd test3_ifu_dataflow
+echo "test3_ifu_dataflow"
+./clean.sh
+echo ""
+cd ..

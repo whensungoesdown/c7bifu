@@ -35,11 +35,6 @@ reg              exu_ifu_ertn;
 reg  [31:0]      exu_ifu_ert_addr;
 reg              exu_ifu_stall;
 
-// Instruction Queue outputs (to decode stage)
-//wire [31:0]      inst_addr_f;
-//wire [31:0]      inst_f;
-//wire             inst_vld_f;
-
 // ================= Instantiate DUT =================
 c7bifu dut (
     .clk                  (clk),
@@ -67,6 +62,8 @@ integer test_num;
 integer error_count;
 integer cycle_count;
 integer instruction_count;
+integer fetch_request_count;
+integer icu_response_count;
 
 // ================= Helper Tasks =================
 task initialize;
@@ -75,6 +72,8 @@ task initialize;
         error_count = 0;
         cycle_count = 0;
         instruction_count = 0;
+        fetch_request_count = 0;
+        icu_response_count = 0;
         
         // Initialize all inputs
         icu_ifu_ack_ic1 = 1'b0;
@@ -86,7 +85,7 @@ task initialize;
         exu_ifu_brn_addr = 32'h0;
         exu_ifu_ertn = 1'b0;
         exu_ifu_ert_addr = 32'h0;
-	exu_ifu_stall = 1'b0;
+        exu_ifu_stall = 1'b0;
     end
 endtask
 
@@ -141,7 +140,7 @@ task wait_for_fetch_request;
     end
 endtask
 
-// Simulate ICU response
+// Simulate ICU response with deterministic checks
 task icu_send_data;
     input [31:0] addr;
     input [63:0] data;
@@ -156,6 +155,7 @@ task icu_send_data;
         icu_ifu_ack_ic1 = 1'b1;
         @(posedge clk);
         icu_ifu_ack_ic1 = 1'b0;
+        icu_response_count = icu_response_count + 1;
         
         // Send data valid after random delay (2-4 cycles)
         valid_delay = $urandom_range(2, 4);
@@ -168,129 +168,240 @@ task icu_send_data;
     end
 endtask
 
+// Check IQ state with assertions - only check iq_full since iq_empty may not exist
+task check_iq_state;
+    input expected_full;
+    input integer test_id;
+    begin
+        // Check IQ full signal (only check this since iq_empty might not exist)
+        if (dut.iq_full !== expected_full) begin
+            $display("  ERROR[Test%0d]: IQ full signal incorrect. Expected %0b, got %0b",
+                    test_id, expected_full, dut.iq_full);
+            error_count = error_count + 1;
+        end
+        
+        $display("  INFO[Test%0d]: IQ state - Full=%0b", test_id, dut.iq_full);
+    end
+endtask
+
+// Check instruction output from IQ - simplified version
+task monitor_iq_outputs;
+    input integer monitor_cycles;
+    input integer test_id;
+    integer inst_count;
+    reg [31:0] last_addr;
+    begin
+        inst_count = 0;
+        last_addr = 32'h0;
+        
+        // Simple monitoring without fork-join
+        repeat(monitor_cycles) begin
+            @(posedge clk);
+            if (dut.inst_vld_f === 1'b1 && exu_ifu_stall === 1'b0) begin
+                inst_count = inst_count + 1;
+                
+                // Check for sequential addresses (when not in control flow change)
+                if (inst_count > 1 && last_addr !== 32'h0) begin
+                    if (dut.inst_addr_f !== (last_addr + 4)) begin
+                        $display("  WARNING[Test%0d]: Non-sequential instruction address: Previous=0x%08h, Current=0x%08h",
+                                test_id, last_addr, dut.inst_addr_f);
+                    end
+                end
+                last_addr = dut.inst_addr_f;
+            end
+        end
+        
+        $display("  INFO[Test%0d]: Read %0d instructions in %0d cycles", test_id, inst_count, monitor_cycles);
+    end
+endtask
+
 // ================= Test Cases =================
 task test_normal_fetch_flow;
     integer i;
     reg [31:0] expected_addr;
+    integer requests_expected;
+    integer responses_expected;
     begin
         $display("\n[%0t] ====== Test %0d: Normal Fetch Flow Test ======", $time, test_num);
         $display("  Testing: Sequential instruction fetch from ICU to IQ");
         
         // Start from reset address
         expected_addr = 32'h1C000000;
+        requests_expected = 4;
+        responses_expected = 4;
+        
+        // Initial IQ should be empty - only check full signal
+        check_iq_state(1'b0, test_num);
         
         // Fetch 4 packets (8 instructions)
-        for (i = 0; i < 4; i = i + 1) begin
+        for (i = 0; i < requests_expected; i = i + 1) begin
             // Wait for request with timeout
             wait_for_fetch_request(expected_addr);
+            fetch_request_count = fetch_request_count + 1;
             
             // Send ICU response with test data
-            //icu_send_data(expected_addr, {32'hA0000000 + i, 32'hB0000000 + i});
             icu_send_data(expected_addr, {expected_addr + 32'hAAA000 + 4, expected_addr + 32'hAAA000});
             
             // Update expected address
             expected_addr = expected_addr + 8;
         end
         
-        // Now read instructions from IQ
-        $display("  Reading instructions from IQ...");
+        // Assert: Must receive expected number of requests
+        if (fetch_request_count < requests_expected) begin
+            $display("  ERROR[Test%0d]: Expected %0d fetch requests, got %0d", 
+                    test_num, requests_expected, fetch_request_count);
+            error_count = error_count + 1;
+        end
         
-        // We should be able to read 8 instructions
-        // The IQ output should be valid when there's data and no stall
-        wait_cycles(10);  // Allow time for instructions to be read
+        // Assert: Must receive expected number of responses
+        if (icu_response_count < responses_expected) begin
+            $display("  ERROR[Test%0d]: Expected %0d ICU responses, got %0d", 
+                    test_num, responses_expected, icu_response_count);
+            error_count = error_count + 1;
+        end
+        
+        // Wait for instructions to be read from IQ
+        $display("  Monitoring IQ outputs...");
+        monitor_iq_outputs(20, test_num);
+        
+        // IQ should not be full after reading some instructions
+        wait_cycles(5);
+        check_iq_state(1'b0, test_num);
         
         test_num = test_num + 1;
-        $display("  Normal fetch flow test completed");
+        $display("  Normal fetch flow test completed with %0d errors", error_count);
     end
 endtask
 
 task test_iq_full_condition;
     integer i;
     integer timeout;
+    reg iq_full_detected;
+    integer requests_before_full;
+    reg loop_done;
     begin
         $display("\n[%0t] ====== Test %0d: IQ Full Condition Test ======", $time, test_num);
         $display("  Testing: Fetch stops when IQ is full");
         
-	$display("Apply stall");
-	exu_ifu_stall = 1'b1;
-
-        // Rapidly fetch until IQ is full
-        for (i = 0; i < 8; i = i + 1) begin  // Try more than capacity
+        iq_full_detected = 0;
+        requests_before_full = 0;
+        loop_done = 0;
+        
+        // Apply stall to prevent instruction consumption
+        $display("  Applying stall to fill IQ...");
+        exu_ifu_stall = 1'b1;
+        wait_cycles(2);
+        
+        // Rapidly fetch until IQ is full - replace break with flag
+        for (i = 0; i < 12 && loop_done === 0; i = i + 1) begin  // Try more than IQ capacity
             timeout = 10;
             while (timeout > 0 && ifu_icu_req_ic1 !== 1'b1) begin
                 @(posedge clk);
                 timeout = timeout - 1;
             end
-
-            //@(posedge clk);
             
             if (ifu_icu_req_ic1 === 1'b1) begin
+                requests_before_full = requests_before_full + 1;
+                fetch_request_count = fetch_request_count + 1;
+                
                 // Send ICU response immediately
                 icu_ifu_ack_ic1 = 1'b1;
                 @(posedge clk);
                 icu_ifu_ack_ic1 = 1'b0;
                 icu_ifu_data_valid_ic2 = 1'b1;
-                //icu_ifu_data_ic2 = {32'hC0000000 + i, 32'hD0000000 + i};
                 icu_ifu_data_ic2 = {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000};
                 @(posedge clk);
                 icu_ifu_data_valid_ic2 = 1'b0;
                 icu_ifu_data_ic2 = 64'h0;
-                @(posedge clk);
+                icu_response_count = icu_response_count + 1;
+                
+                // Check if IQ becomes full
+                //if (dut.iq_full === 1'b1 && iq_full_detected === 0) begin
+                //    $display("  IQ full detected after %0d packets", i+1);
+                //    iq_full_detected = 1;
+                //    
+                //    // Assert: When IQ is full, fetch should stop
+                //    wait_cycles(5);
+                //    if (ifu_icu_req_ic1 === 1'b1) begin
+                //        $display("  ERROR[Test%0d]: Fetch should stop when IQ is full", test_num);
+                //        error_count = error_count + 1;
+                //    end
+                //end
             end else if (dut.iq_full === 1'b1) begin
-                $display("  IQ full detected at packet %0d (no more requests)", i);
-
-		$display("Release stall");
-	        exu_ifu_stall = 1'b0;
-                if (ifu_icu_req_ic1 === 1'b1) begin
-                    $display("  ERROR: Fetch should stop when IQ is full");
-                    error_count = error_count + 1;
-                end
-                i = 8;  // Exit loop
+                // IQ is full and no more requests (expected behavior)
+                $display("  IQ full detected after %0d packets", i);
+                iq_full_detected = 1;
+                $display("  No more fetch requests when IQ is full (expected)");
+                loop_done = 1;  // Set flag to exit loop
             end
         end
         
-        // Verify that fetch stopped
-        //wait_cycles(5);
-        //if (ifu_icu_req_ic1 === 1'b1) begin
-        //    $display("  ERROR: Fetch should stop when IQ is full");
-        //    error_count = error_count + 1;
-        //end
-        
-        // Read some instructions to make space
-        $display("  Reading instructions to clear IQ...");
-        wait_cycles(10);
-        
-        // Verify fetch resumes
-        wait_cycles(5);
-        if (ifu_icu_req_ic1 !== 1'b1) begin
-            $display("  ERROR: Fetch should resume after IQ has space");
+        // Assert: Must detect IQ full condition
+        if (iq_full_detected === 0) begin
+            $display("  ERROR[Test%0d]: IQ full condition not detected", test_num);
             error_count = error_count + 1;
         end
         
+        // Release stall and read instructions to clear IQ
+        $display("  Releasing stall and clearing IQ...");
+        exu_ifu_stall = 1'b0;
+        
+        // Monitor IQ outputs as instructions are read
+        monitor_iq_outputs(15, test_num);
+        
+        // Verify fetch resumes after IQ has space
+        timeout = 20;
+        while (timeout > 0 && ifu_icu_req_ic1 !== 1'b1) begin
+            @(posedge clk);
+            timeout = timeout - 1;
+        end
+        
+        // Assert: Fetch should resume after IQ is cleared
+        if (ifu_icu_req_ic1 !== 1'b1) begin
+            $display("  ERROR[Test%0d]: Fetch did not resume after IQ has space", test_num);
+            error_count = error_count + 1;
+        end else begin
+            $display("  Fetch resumed successfully (as expected)");
+        end
+        
         test_num = test_num + 1;
-        $display("  IQ full condition test completed");
+        $display("  IQ full condition test completed with %0d errors", error_count);
     end
 endtask
 
 task test_exception_flow;
+    integer timeout;
+    reg [31:0] addr_before_exception;
     begin
         $display("\n[%0t] ====== Test %0d: Exception Flow Test ======", $time, test_num);
         $display("  Testing: Exception flushes pipeline and redirects to ISR");
         
         // First fetch a few instructions
         $display("  Fetching normal instructions...");
-        // Use simplified version for this test
-	//wait_cycles(5);
-	// Send ICU response immediately
-	icu_ifu_ack_ic1 = 1'b1;
-	@(posedge clk);
-	icu_ifu_ack_ic1 = 1'b0;
-	icu_ifu_data_valid_ic2 = 1'b1;
-	icu_ifu_data_ic2 = {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000};
-	@(posedge clk);
-	icu_ifu_data_valid_ic2 = 1'b0;
-	icu_ifu_data_ic2 = 64'h0;
-	//@(posedge clk);
+        
+        // Wait for fetch request and capture address
+        timeout = 20;
+        while (timeout > 0 && ifu_icu_req_ic1 !== 1'b1) begin
+            @(posedge clk);
+            timeout = timeout - 1;
+        end
+        
+        if (ifu_icu_req_ic1 === 1'b1) begin
+            addr_before_exception = ifu_icu_addr_ic1;
+            $display("  Current fetch address before exception: 0x%08h", addr_before_exception);
+            
+            // Send ICU response
+            icu_ifu_ack_ic1 = 1'b1;
+            @(posedge clk);
+            icu_ifu_ack_ic1 = 1'b0;
+            icu_ifu_data_valid_ic2 = 1'b1;
+            icu_ifu_data_ic2 = {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000};
+            @(posedge clk);
+            icu_ifu_data_valid_ic2 = 1'b0;
+            icu_ifu_data_ic2 = 64'h0;
+            fetch_request_count = fetch_request_count + 1;
+            icu_response_count = icu_response_count + 1;
+        end
         
         // Trigger exception
         $display("  Triggering exception...");
@@ -302,38 +413,62 @@ task test_exception_flow;
         
         // Verify flush occurs and new fetch starts at ISR address
         wait_for_fetch_request(32'h80000000);
+        fetch_request_count = fetch_request_count + 1;
+        
+        // Assert: Should NOT continue fetching from previous address
+        if (ifu_icu_addr_ic1 === addr_before_exception) begin
+            $display("  ERROR[Test%0d]: Fetch should redirect to ISR, not continue from previous address", test_num);
+            error_count = error_count + 1;
+        end
         
         // Send ICU response for ISR
-        //icu_send_data(32'h80000000, 64'hE1234567_FEDCBA98);
-        //icu_send_data(32'h80000000, 64'h8AAA0004_8AAA0000);
         icu_send_data(32'h80000000, {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000});
         
-        // Read from IQ
-        wait_cycles(10);
+        // Read from IQ and verify we get ISR instructions
+        $display("  Reading instructions after exception...");
+        monitor_iq_outputs(10, test_num);
+        
+        // Verify IQ state after exception
+        check_iq_state(1'b0, test_num);
         
         test_num = test_num + 1;
-        $display("  Exception flow test completed");
+        $display("  Exception flow test completed with %0d errors", error_count);
     end
 endtask
 
 task test_branch_flow;
+    integer timeout;
+    reg [31:0] addr_before_branch;
     begin
         $display("\n[%0t] ====== Test %0d: Branch Flow Test ======", $time, test_num);
         $display("  Testing: Branch redirects fetch to target address");
         
         // Fetch a few instructions
         $display("  Fetching normal instructions...");
-        //wait_cycles(5);
-	// Send ICU response immediately
-	icu_ifu_ack_ic1 = 1'b1;
-	@(posedge clk);
-	icu_ifu_ack_ic1 = 1'b0;
-	icu_ifu_data_valid_ic2 = 1'b1;
-	icu_ifu_data_ic2 = {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000};
-	@(posedge clk);
-	icu_ifu_data_valid_ic2 = 1'b0;
-	icu_ifu_data_ic2 = 64'h0;
-	//@(posedge clk);
+        
+        // Wait for fetch request and capture address
+        timeout = 20;
+        while (timeout > 0 && ifu_icu_req_ic1 !== 1'b1) begin
+            @(posedge clk);
+            timeout = timeout - 1;
+        end
+        
+        if (ifu_icu_req_ic1 === 1'b1) begin
+            addr_before_branch = ifu_icu_addr_ic1;
+            $display("  Current fetch address before branch: 0x%08h", addr_before_branch);
+            
+            // Send ICU response
+            icu_ifu_ack_ic1 = 1'b1;
+            @(posedge clk);
+            icu_ifu_ack_ic1 = 1'b0;
+            icu_ifu_data_valid_ic2 = 1'b1;
+            icu_ifu_data_ic2 = {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000};
+            @(posedge clk);
+            icu_ifu_data_valid_ic2 = 1'b0;
+            icu_ifu_data_ic2 = 64'h0;
+            fetch_request_count = fetch_request_count + 1;
+            icu_response_count = icu_response_count + 1;
+        end
         
         // Trigger branch
         $display("  Triggering branch...");
@@ -345,56 +480,56 @@ task test_branch_flow;
         
         // Verify flush occurs and new fetch starts at branch target
         wait_for_fetch_request(32'h40001000);
+        fetch_request_count = fetch_request_count + 1;
+        
+        // Assert: Should NOT continue fetching from previous address
+        if (ifu_icu_addr_ic1 === addr_before_branch) begin
+            $display("  ERROR[Test%0d]: Fetch should redirect to branch target, not continue from previous address", test_num);
+            error_count = error_count + 1;
+        end
         
         // Send ICU response for branch target
-        //icu_send_data(32'h40001000, 64'hBEEFBABE_CAFEDEAD);
         icu_send_data(32'h40001000, {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000});
         
         // Read from IQ
-        wait_cycles(10);
+        $display("  Reading instructions after branch...");
+        monitor_iq_outputs(10, test_num);
         
         test_num = test_num + 1;
-        $display("  Branch flow test completed");
+        $display("  Branch flow test completed with %0d errors", error_count);
     end
 endtask
 
 task test_ertn_flow;
+    integer timeout;
     begin
         $display("\n[%0t] ====== Test %0d: ERTN (Exception Return) Flow Test ======", $time, test_num);
         $display("  Testing: ERTN returns from exception");
         
         // First go to exception
         $display("  Going to exception first...");
-        //wait_cycles(5);
-	
-	// Send ICU response immediately
-	icu_ifu_ack_ic1 = 1'b1;
-	@(posedge clk);
-	icu_ifu_ack_ic1 = 1'b0;
-	icu_ifu_data_valid_ic2 = 1'b1;
-	icu_ifu_data_ic2 = {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000};
-	@(posedge clk);
-	icu_ifu_data_valid_ic2 = 1'b0;
-	icu_ifu_data_ic2 = 64'h0;
-	//@(posedge clk);
-	
+        
+        // Trigger exception
         exu_ifu_except = 1'b1;
         exu_ifu_isr_addr = 32'h80000000;
         @(posedge clk);
         exu_ifu_except = 1'b0;
         exu_ifu_isr_addr = 32'h0;
-        //wait_cycles(5);
-	
-	// Send ICU response immediately
-	icu_ifu_ack_ic1 = 1'b1;
-	@(posedge clk);
-	icu_ifu_ack_ic1 = 1'b0;
-	icu_ifu_data_valid_ic2 = 1'b1;
-	icu_ifu_data_ic2 = {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000};
-	@(posedge clk);
-	icu_ifu_data_valid_ic2 = 1'b0;
-	icu_ifu_data_ic2 = 64'h0;
-	//@(posedge clk);
+        
+        // Wait for fetch request to ISR
+        wait_for_fetch_request(32'h80000000);
+        fetch_request_count = fetch_request_count + 1;
+        
+        // Send ICU response for ISR
+        icu_ifu_ack_ic1 = 1'b1;
+        @(posedge clk);
+        icu_ifu_ack_ic1 = 1'b0;
+        icu_ifu_data_valid_ic2 = 1'b1;
+        icu_ifu_data_ic2 = {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000};
+        @(posedge clk);
+        icu_ifu_data_valid_ic2 = 1'b0;
+        icu_ifu_data_ic2 = 64'h0;
+        icu_response_count = icu_response_count + 1;
         
         // Trigger ERTN to return
         $display("  Triggering ERTN to return...");
@@ -406,20 +541,28 @@ task test_ertn_flow;
         
         // Verify flush occurs and fetch resumes at return address
         wait_for_fetch_request(32'h1C000010);
+        fetch_request_count = fetch_request_count + 1;
+        
+        // Assert: Should fetch from return address, not continue from ISR
+        if (ifu_icu_addr_ic1 === 32'h80000008) begin
+            $display("  ERROR[Test%0d]: Fetch should return from exception, not continue from ISR", test_num);
+            error_count = error_count + 1;
+        end
         
         // Send ICU response for return address
-        //icu_send_data(32'h1C000010, 64'hDEADBEEF_CAFEBABE);
         icu_send_data(32'h1c000010, {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000});
         
         // Read from IQ
-        wait_cycles(10);
+        $display("  Reading instructions after ERTN...");
+        monitor_iq_outputs(10, test_num);
         
         test_num = test_num + 1;
-        $display("  ERTN flow test completed");
+        $display("  ERTN flow test completed with %0d errors", error_count);
     end
 endtask
 
 task test_concurrent_events;
+    integer timeout;
     begin
         $display("\n[%0t] ====== Test %0d: Concurrent Events Test ======", $time, test_num);
         $display("  Testing: Multiple control flow events in quick succession");
@@ -429,11 +572,13 @@ task test_concurrent_events;
         
         // Wait for first request
         wait_for_condition(ifu_icu_req_ic1);
+        fetch_request_count = fetch_request_count + 1;
         
         // Send ack but delay data (to create data stall)
         icu_ifu_ack_ic1 = 1'b1;
         @(posedge clk);
         icu_ifu_ack_ic1 = 1'b0;
+        icu_response_count = icu_response_count + 1;
         
         // While data is pending, trigger exception
         $display("  Triggering exception during pending data...");
@@ -445,16 +590,21 @@ task test_concurrent_events;
         
         // Now send the delayed data (should be cancelled due to flush)
         icu_ifu_data_valid_ic2 = 1'b1;
-        //icu_ifu_data_ic2 = 64'h11111111_22222222;
         icu_ifu_data_ic2 = {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000};
         @(posedge clk);
         icu_ifu_data_valid_ic2 = 1'b0;
         
         // Verify fetch redirects to ISR
         wait_for_fetch_request(32'h90000000);
+        fetch_request_count = fetch_request_count + 1;
+        
+        // Assert: Should fetch from ISR, not continue previous fetch
+        if (ifu_icu_addr_ic1 !== 32'h90000000) begin
+            $display("  ERROR[Test%0d]: Should fetch from ISR after exception", test_num);
+            error_count = error_count + 1;
+        end
         
         // Send ISR data
-        //icu_send_data(32'h90000000, 64'h33333333_44444444);
         icu_send_data(32'h90000000, {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000});
         
         // Immediately trigger branch
@@ -467,9 +617,16 @@ task test_concurrent_events;
         
         // Verify fetch redirects to branch target
         wait_for_fetch_request(32'h50000000);
+        fetch_request_count = fetch_request_count + 1;
+        
+        // Assert: Should fetch from branch target, not continue from ISR
+        if (ifu_icu_addr_ic1 !== 32'h50000000) begin
+            $display("  ERROR[Test%0d]: Should fetch from branch target after branch", test_num);
+            error_count = error_count + 1;
+        end
         
         test_num = test_num + 1;
-        $display("  Concurrent events test completed");
+        $display("  Concurrent events test completed with %0d errors", error_count);
     end
 endtask
 
@@ -491,14 +648,16 @@ initial begin
     // Test 1: Normal instruction fetch flow
     test_normal_fetch_flow;
     
-    // Clear pipeline
+    // Clear pipeline between tests
     wait_cycles(20);
+    exu_ifu_stall = 1'b0;  // Ensure no stall
     
     // Test 2: IQ full condition
     test_iq_full_condition;
     
     // Clear pipeline
     wait_cycles(20);
+    exu_ifu_stall = 1'b0;
     
     // Test 3: Exception handling
     test_exception_flow;
@@ -527,6 +686,20 @@ initial begin
     $display("--------------------------------------------------");
     $display("Total tests completed: %0d", test_num - 1);
     $display("Total errors detected: %0d", error_count);
+    $display("Total cycles: %0d", cycle_count);
+    $display("Total instructions read: %0d", instruction_count);
+    $display("Total fetch requests: %0d", fetch_request_count);
+    $display("Total ICU responses: %0d", icu_response_count);
+    
+    // Simple performance metrics
+    if (cycle_count > 0 && instruction_count > 0) begin
+        $display("IPC ratio: %0d instructions / %0d cycles", instruction_count, cycle_count);
+    end
+    
+    if (fetch_request_count > 0 && instruction_count > 0) begin
+        $display("Fetch efficiency: %0d fetch requests for %0d instructions", 
+                fetch_request_count, instruction_count);
+    end
     
     if (error_count == 0) begin
         $display("\nALL TESTS PASSED!");
@@ -537,9 +710,35 @@ initial begin
         $display("- Branch handling: OK");
         $display("- ERTN handling: OK");
         $display("- Concurrent events: OK");
+        $display("\nPASS!\n");
+        $display("\033[0;32m");
+        $display("**************************************************");
+        $display("*                                                *");
+        $display("*      * * *       *        * * *     * * *      *");
+        $display("*      *    *     * *      *         *           *");
+        $display("*      * * *     *   *      * * *     * * *      *");
+        $display("*      *        * * * *          *         *     *");
+        $display("*      *       *       *    * * *     * * *      *");
+        $display("*                                                *");
+        $display("**************************************************");
+        $display("\n");
+        $display("\033[0m");
     end else begin
         $display("\nTEST FAILED!");
         $display("Found %0d error(s) in the design.", error_count);
+        $display("\nFAIL!\n");
+        $display("\033[0;31m");
+        $display("**************************************************");
+        $display("*                                                *");
+        $display("*      * * *       *         ***      *          *");
+        $display("*      *          * *         *       *          *");
+        $display("*      * * *     *   *        *       *          *");
+        $display("*      *        * * * *       *       *          *");
+        $display("*      *       *       *     ***      * * *      *");
+        $display("*                                                *");
+        $display("**************************************************");
+        $display("\n");
+        $display("\033[0m");
     end
     
     $display("==================================================");
@@ -553,44 +752,49 @@ always @(posedge clk) begin
     cycle_count = cycle_count + 1;
     
     // Count instructions read
-    if (dut.inst_vld_f) begin
+    if (dut.inst_vld_f === 1'b1 && exu_ifu_stall === 1'b0) begin
         instruction_count = instruction_count + 1;
         $display("[%0t] Cycle %0d: INSTRUCTION READ - Addr=0x%08h, Inst=0x%08h (Total: %0d)", 
                 $time, cycle_count, dut.inst_addr_f, dut.inst_f, instruction_count);
     end
     
     // Monitor important state changes
-    if (resetn) begin
+    if (resetn === 1'b1) begin
         // Log fetch requests
-        if (ifu_icu_req_ic1) begin
+        if (ifu_icu_req_ic1 === 1'b1) begin
             $display("[%0t] Cycle %0d: FETCH REQ  - Addr=0x%08h", $time, cycle_count, ifu_icu_addr_ic1);
         end
         
         // Log ICU responses
-        if (icu_ifu_ack_ic1) begin
+        if (icu_ifu_ack_ic1 === 1'b1) begin
             $display("[%0t] Cycle %0d: ICU ACK", $time, cycle_count);
         end
         
-        if (icu_ifu_data_valid_ic2) begin
+        if (icu_ifu_data_valid_ic2 === 1'b1) begin
             $display("[%0t] Cycle %0d: ICU DATA   - Data=0x%016h", $time, cycle_count, icu_ifu_data_ic2);
         end
         
         // Log control flow events
-        if (exu_ifu_except) begin
+        if (exu_ifu_except === 1'b1) begin
             $display("[%0t] Cycle %0d: EXCEPTION  - ISR Addr=0x%08h", $time, cycle_count, exu_ifu_isr_addr);
         end
         
-        if (exu_ifu_branch) begin
+        if (exu_ifu_branch === 1'b1) begin
             $display("[%0t] Cycle %0d: BRANCH     - Target=0x%08h", $time, cycle_count, exu_ifu_brn_addr);
         end
         
-        if (exu_ifu_ertn) begin
+        if (exu_ifu_ertn === 1'b1) begin
             $display("[%0t] Cycle %0d: ERTN       - Return=0x%08h", $time, cycle_count, exu_ifu_ert_addr);
         end
         
         // Log pipeline flushes
-        if (exu_ifu_except || exu_ifu_branch || exu_ifu_ertn) begin
+        if (exu_ifu_except === 1'b1 || exu_ifu_branch === 1'b1 || exu_ifu_ertn === 1'b1) begin
             $display("[%0t] Cycle %0d: PIPELINE FLUSH", $time, cycle_count);
+        end
+        
+        // Log IQ state changes - only iq_full
+        if (dut.iq_full === 1'b1) begin
+            $display("[%0t] Cycle %0d: IQ STATE   - FULL", $time, cycle_count);
         end
     end
 end
@@ -599,6 +803,10 @@ end
 initial begin
     $dumpfile("top_tb.vcd");
     $dumpvars(0, top_tb);
+    // Add specific signals for better debugging
+    $dumpvars(1, dut.iq_full);
+    $dumpvars(1, dut.inst_vld_f);
+    $dumpvars(1, dut.inst_addr_f);
 end
 
 endmodule
