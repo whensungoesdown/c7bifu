@@ -1,0 +1,13 @@
+// BRU encoding
+`define LBRU_CODE_BIT    4
+`define LBRU_IDLE        4'b0000
+`define LBRU_EQ          4'b0001
+`define LBRU_NE          4'b0010
+`define LBRU_LT          4'b0011
+`define LBRU_GE          4'b0100
+`define LBRU_JR          4'b0101
+`define LBRU_EQZ         4'b0110
+`define LBRU_NEZ         4'b0111
+`define LBRU_LTU         4'b1000
+`define LBRU_GEU         4'b1001
+`define LBRU_BL          4'b1010

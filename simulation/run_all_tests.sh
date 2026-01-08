@@ -48,3 +48,15 @@ else
 fi
 echo ""
 cd ..
+
+
+cd test4_dec
+echo "test4_dec"
+if ./simulate.sh | grep PASS; then
+	printf ""
+else
+	printf "Fail!\n"
+	exit
+fi
+echo ""
+cd ..

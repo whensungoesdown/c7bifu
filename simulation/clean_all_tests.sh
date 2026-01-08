@@ -28,3 +28,10 @@ echo "test3_ifu_dataflow"
 ./clean.sh
 echo ""
 cd ..
+
+
+cd test4_dec
+echo "test4_dec"
+./clean.sh
+echo ""
+cd ..

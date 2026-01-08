@@ -1,3 +1,7 @@
 ${PROJECT_ROOT}/rtl/c7bifu_fcl.v 
 ${PROJECT_ROOT}/rtl/c7bifu_iq.v 
+${PROJECT_ROOT}/rtl/dec_defs.v 
+${PROJECT_ROOT}/rtl/c7bifu_imd.v 
+${PROJECT_ROOT}/rtl/decoder.v 
+${PROJECT_ROOT}/rtl/c7bifu_dec.v 
 ${PROJECT_ROOT}/rtl/c7bifu.v 
