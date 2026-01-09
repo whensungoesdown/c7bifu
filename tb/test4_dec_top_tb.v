@@ -1698,6 +1698,55 @@ module top_tb();
             #10;
         end
     endtask
+
+    // =============================
+    // Test Function: illegal instruction
+    // =============================
+    task test_exc_illinst;
+        input [31:0] expected_pc;
+        input [31:0] inst;
+        begin
+            test_count = test_count + 1;
+            $display("==========================================");
+            $display("Test %0d: illegal instruction (inst=0x%08h)", test_count, inst);
+            $display("==========================================");
+            
+            // Set test inputs
+            inst_vld_f   = 1;
+            inst_addr_f  = expected_pc;
+            inst_f       = inst;
+            
+            // Wait one clock cycle for signal propagation
+            #10;
+            
+            // Check output signals
+            if (ifu_exu_vld_d !== 1'b1) begin
+                $display("[FAIL] Instruction valid at D stage");
+                fail_count = fail_count + 1;
+            end else if (dec_exc_vld_d === 1'b0) begin
+                $display("[FAIL] Illinstr exception is not detected");
+                fail_count = fail_count + 1;
+            end else if (dec_exc_code_d !== 6'h0d) begin
+                $display("[FAIL] Illinstr exception is not detected");
+                $display("[FAIL] Exception code incorrect: %0d (expected 13)", dec_exc_code_d);
+                fail_count = fail_count + 1;
+            end else begin
+                $display("[PASS] All checks passed");
+                pass_count = pass_count + 1;
+            end
+            
+            // Display detailed information
+            $display("Detailed results:");
+            $display("  PC: 0x%08h", ifu_exu_pc_d);
+            $display("  inst_vld_d: %b", ifu_exu_vld_d);
+            $display("  exc_vld_d: %b", dec_exc_vld_d);
+            $display("");
+            
+            // Clear input signals
+            inst_vld_f = 0;
+            #10;
+        end
+    endtask
     
     // =============================
     // Test Scheduler Task
@@ -1779,6 +1828,9 @@ module top_tb();
             // Test 25: ertn
             test_ertn(32'h8000_0060, 32'h06483800);
             
+            // Test 26: illegal instruction
+            test_exc_illinst(32'h8000_0064, 32'hffffffff);
+
             // Display final statistics
             display_statistics();
         end
