@@ -24,8 +24,6 @@ module top_tb();
     wire [31:0] ifu_exu_pc_d;
     wire [4:0]  ifu_exu_rs1_d;
     wire [4:0]  ifu_exu_rs2_d;
-    wire        ifu_exu_double_read_d;
-    wire [31:0] ifu_exu_imm_shifted_d;
     wire [4:0]  ifu_exu_rd_d;
     wire        ifu_exu_wen_d;
     wire        ifu_exu_alu_vld_d;
@@ -35,22 +33,18 @@ module top_tb();
     wire        ifu_exu_alu_b_imm_d;
     wire        ifu_exu_lsu_vld_d;
     wire [6:0]  ifu_exu_lsu_op_d;
-    //wire [4:0]  ifu_exu_lsu_rd_d;
-    //wire        ifu_exu_lsu_wen_d;
+    wire        ifu_exu_lsu_double_read_d;
+    wire [31:0] ifu_exu_lsu_imm_shifted_d;
     wire        ifu_exu_bru_vld_d;
     wire [3:0]  ifu_exu_bru_op_d;
     wire [31:0] ifu_exu_bru_offset_d;
-    //wire        ifu_exu_bru_wen_d;
     wire        ifu_exu_mul_vld_d;
-    //wire [4:0]  ifu_exu_mul_rd_d;
-    //wire        ifu_exu_mul_wen_d;
     wire        ifu_exu_mul_signed_d;
     wire        ifu_exu_mul_double_d;
     wire        ifu_exu_mul_hi_d;
     wire        ifu_exu_mul_short_d;
     wire        ifu_exu_csr_vld_d;
     wire [13:0] ifu_exu_csr_raddr_d;
-    //wire        ifu_exu_csr_rdwen_d;
     wire        ifu_exu_csr_xchg_d;
     wire        ifu_exu_csr_wen_d;
     wire [13:0] ifu_exu_csr_waddr_d;
@@ -87,8 +81,6 @@ module top_tb();
         .ifu_exu_pc_d            (ifu_exu_pc_d),
         .ifu_exu_rs1_d           (ifu_exu_rs1_d),
         .ifu_exu_rs2_d           (ifu_exu_rs2_d),
-        .ifu_exu_double_read_d   (ifu_exu_double_read_d),
-        .ifu_exu_imm_shifted_d   (ifu_exu_imm_shifted_d),
         .ifu_exu_rd_d            (ifu_exu_rd_d),
         .ifu_exu_wen_d           (ifu_exu_wen_d),
         .ifu_exu_alu_vld_d       (ifu_exu_alu_vld_d),
@@ -98,22 +90,18 @@ module top_tb();
         .ifu_exu_alu_b_imm_d     (ifu_exu_alu_b_imm_d),
         .ifu_exu_lsu_vld_d       (ifu_exu_lsu_vld_d),
         .ifu_exu_lsu_op_d        (ifu_exu_lsu_op_d),
-        //.ifu_exu_lsu_rd_d        (ifu_exu_lsu_rd_d),
-        //.ifu_exu_lsu_wen_d       (ifu_exu_lsu_wen_d),
+        .ifu_exu_lsu_double_read_d (ifu_exu_lsu_double_read_d),
+        .ifu_exu_lsu_imm_shifted_d (ifu_exu_lsu_imm_shifted_d),
         .ifu_exu_bru_vld_d       (ifu_exu_bru_vld_d),
         .ifu_exu_bru_op_d        (ifu_exu_bru_op_d),
         .ifu_exu_bru_offset_d    (ifu_exu_bru_offset_d),
-	//.ifu_exu_bru_wen_d       (ifu_exu_bru_wen_d),
         .ifu_exu_mul_vld_d       (ifu_exu_mul_vld_d),
-        //.ifu_exu_mul_rd_d        (ifu_exu_mul_rd_d),
-        //.ifu_exu_mul_wen_d       (ifu_exu_mul_wen_d),
         .ifu_exu_mul_signed_d    (ifu_exu_mul_signed_d),
         .ifu_exu_mul_double_d    (ifu_exu_mul_double_d),
         .ifu_exu_mul_hi_d        (ifu_exu_mul_hi_d),
         .ifu_exu_mul_short_d     (ifu_exu_mul_short_d),
         .ifu_exu_csr_vld_d       (ifu_exu_csr_vld_d),
         .ifu_exu_csr_raddr_d     (ifu_exu_csr_raddr_d),
-        //.ifu_exu_csr_rdwen_d     (ifu_exu_csr_rdwen_d),
         .ifu_exu_csr_xchg_d      (ifu_exu_csr_xchg_d),
         .ifu_exu_csr_wen_d       (ifu_exu_csr_wen_d),
         .ifu_exu_csr_waddr_d     (ifu_exu_csr_waddr_d),

@@ -3,6 +3,8 @@
 
 ${PROJECT_ROOT}/simulation/altera_mf.v
 
++incdir+${PROJECT_ROOT}/rtl/import
+
 ${PROJECT_ROOT}/rtl/lib/swrvr_clib.v
 ${PROJECT_ROOT}/rtl/lib/swrvr_dlib.v
 ${PROJECT_ROOT}/rtl/c7bifu_fcl.v 
