@@ -35,3 +35,10 @@ echo "test4_dec"
 ./clean.sh
 echo ""
 cd ..
+
+
+cd test5_ifu_flush_stall
+echo "test5_ifu_flush_stall"
+./clean.sh
+echo ""
+cd ..

@@ -88,7 +88,7 @@ module c7bifu (
    wire iq_full;
 
    wire dec_exc_vld_d;
-   wire dec_exc_code_d;
+   wire [5:0] dec_exc_code_d;
    
 
    c7bifu_fcl u_fcl (
@@ -156,8 +156,8 @@ module c7bifu (
       .ifu_exu_pc_d                    (ifu_exu_pc_d),
       .ifu_exu_rs1_d                   (ifu_exu_rs1_d),
       .ifu_exu_rs2_d                   (ifu_exu_rs2_d),
-      .ifu_exu_rd_d                    (ifu_exurd_d),
-      .ifu_exu_wen_d                   (ifu_exuwen_d),
+      .ifu_exu_rd_d                    (ifu_exu_rd_d),
+      .ifu_exu_wen_d                   (ifu_exu_wen_d),
 
       // alu
       .ifu_exu_alu_vld_d               (ifu_exu_alu_vld_d),

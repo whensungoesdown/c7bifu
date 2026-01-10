@@ -60,3 +60,15 @@ else
 fi
 echo ""
 cd ..
+
+
+cd test5_ifu_flush_stall
+echo "test5_ifu_flush_stall"
+if ./simulate.sh | grep PASS; then
+	printf ""
+else
+	printf "Fail!\n"
+	exit
+fi
+echo ""
+cd ..

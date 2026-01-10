@@ -84,7 +84,7 @@ module c7bifu_dec (
       .br_offs                         (br_offs_d)
       );
 
-   assign dec_exc_vld_d = op_d[`LSYSCALL] | op_d[`LBREAK ] | op_d[`LINE]; // || int_except;
+   assign dec_exc_vld_d = (op_d[`LSYSCALL] | op_d[`LBREAK ] | op_d[`LINE]) & ifu_exu_vld_d; // || int_except;
    assign dec_exc_code_d = //int_except                ? `EXC_INT          :  // interrupt send into EXU
                            op_d[`LSYSCALL] ? `EXC_SYS :
                            op_d[`LBREAK  ] ? `EXC_BRK :
@@ -186,27 +186,25 @@ module c7bifu_dec (
    //
 
    // Pipeline register enable logic
-   // inst_vld_f is already controlled by previous pipeline stage (IQ)
-   // and includes stall logic, so no need to apply && ~stall here
-   wire reg_en = inst_vld_f;
+   // If flush during a stall, the stalled pipeline registers also need to be
+   // flushed.
+   wire reg_en = ~stall | flush;
 
    // Pipeline register reset logic
    // Reset registers when resetn is low (active low) OR flush is high
-   wire reg_rst = ~resetn || flush;
+   //wire reg_rst = ~resetn || flush;
 
    // Pipeline PC register
-   dffrle_ns #(32) ifu_exu_pc_reg (
-      .din   (inst_addr_f),
-      .rst_l (~reg_rst),     // Active low reset: invert reg_rst
+   dffe_ns #(32) ifu_exu_pc_reg (
+      .din   (inst_addr_f & {32{~flush}}),
       .en    (reg_en),
       .clk   (clk),
       .q     (ifu_exu_pc_d)
    );
 
    // Instruction register
-   dffrle_ns #(32) inst_reg (
-      .din   (inst_f),
-      .rst_l (~reg_rst),     // Active low reset: invert reg_rst
+   dffe_ns #(32) inst_reg (
+      .din   (inst_f & {32{~flush}}),
       .en    (reg_en),
       .clk   (clk),
       .q     (inst_d)
@@ -214,8 +212,8 @@ module c7bifu_dec (
 
    // Instruction valid register
    dffrle_ns #(1) inst_vld_reg (
-      .din   (inst_vld_f),
-      .rst_l (~reg_rst),     // Active low reset: invert reg_rst
+      .din   (inst_vld_f & ~flush),
+      .rst_l (resetn),
       .en    (reg_en),
       .clk   (clk),
       .q     (inst_vld_d)

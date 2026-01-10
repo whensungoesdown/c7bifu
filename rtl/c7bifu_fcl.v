@@ -34,8 +34,6 @@ module c7bifu_fcl (
    wire stall_pf;
    wire stall_f;
 
-   //wire flush;
-
    wire icu_req;
    wire icu_req_in;
    wire icu_req_q;
