@@ -19,10 +19,12 @@ module c7bifu_dec (
 
    output [4:0]       ifu_exu_rd_d,
    output             ifu_exu_wen_d,
+   output [31:0]      ifu_exu_imm_shifted_d,
    
    // alu
    output             ifu_exu_alu_vld_d,
    output [5:0]       ifu_exu_alu_op_d,
+   output             ifu_exu_alu_a_pc_d,
    output [31:0]      ifu_exu_alu_c_d,
    output             ifu_exu_alu_double_word_d,
    output             ifu_exu_alu_b_imm_d,
@@ -31,7 +33,6 @@ module c7bifu_dec (
    output             ifu_exu_lsu_vld_d,
    output [6:0]       ifu_exu_lsu_op_d,
    output             ifu_exu_lsu_double_read_d,
-   output [31:0]      ifu_exu_lsu_imm_shifted_d,
 
    // bru
    output             ifu_exu_bru_vld_d,
@@ -131,10 +132,12 @@ module c7bifu_dec (
    assign ifu_exu_rs2_d = op_d[`LRD_READ] ? `GET_RD(inst_d) : `GET_RK(inst_d);
    assign ifu_exu_wen_d = op_d[`LGR_WEN];
    assign ifu_exu_rd_d = (op_d[`LBRU_RELATED] && (op_d[`LBRU_CODE] == `LBRU_BL)) ? 5'd1 : `GET_RD(inst_d);
+   assign ifu_exu_imm_shifted_d = imm_shifted_d;
 
    // alu
    assign ifu_exu_alu_vld_d = alu_dispatch_d & ifu_exu_vld_d;
    assign ifu_exu_alu_op_d = op_d[`LALU_CODE]; // ALU_CODE_BIT 6
+   assign ifu_exu_alu_a_pc_d = op_d[`LPC_RELATED];
    assign ifu_exu_alu_c_d = alu_c_d;
    assign ifu_exu_alu_double_word_d = op_d[`LDOUBLE_WORD];
    assign ifu_exu_alu_b_imm_d = (op_d[`LI5] || op_d[`LI12] || op_d[`LI16] || op_d[`LI20]) & alu_dispatch_d;
@@ -143,7 +146,6 @@ module c7bifu_dec (
    assign ifu_exu_lsu_vld_d = lsu_dispatch_d & ifu_exu_vld_d; 
    assign ifu_exu_lsu_op_d = op_d[`LOP_CODE];
    assign ifu_exu_lsu_double_read_d = op_d[`LDOUBLE_READ] & lsu_dispatch_d;
-   assign ifu_exu_lsu_imm_shifted_d = imm_shifted_d;
    
    // bru
    assign ifu_exu_bru_vld_d = bru_dispatch_d & ifu_exu_vld_d;

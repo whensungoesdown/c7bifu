@@ -21,10 +21,12 @@ module c7bifu (
    output [4:0]       ifu_exu_rs2_d,
    output [4:0]       ifu_exu_rd_d,
    output             ifu_exu_wen_d,
+   output [31:0]      ifu_exu_imm_shifted_d,
    
    // alu
    output             ifu_exu_alu_vld_d,
    output [5:0]       ifu_exu_alu_op_d, // ALU_CODE_BIT 6
+   output             ifu_exu_alu_a_pc_d, 
    output [31:0]      ifu_exu_alu_c_d,
    output             ifu_exu_alu_double_word_d,
    output             ifu_exu_alu_b_imm_d,
@@ -33,7 +35,6 @@ module c7bifu (
    output             ifu_exu_lsu_vld_d,
    output [6:0]       ifu_exu_lsu_op_d, // LSU_CODE_BIT 7
    output             ifu_exu_lsu_double_read_d,
-   output [31:0]      ifu_exu_lsu_imm_shifted_d,
 
    // bru
    output             ifu_exu_bru_vld_d,
@@ -158,10 +159,12 @@ module c7bifu (
       .ifu_exu_rs2_d                   (ifu_exu_rs2_d),
       .ifu_exu_rd_d                    (ifu_exu_rd_d),
       .ifu_exu_wen_d                   (ifu_exu_wen_d),
+      .ifu_exu_imm_shifted_d           (ifu_exu_imm_shifted_d),
 
       // alu
       .ifu_exu_alu_vld_d               (ifu_exu_alu_vld_d),
       .ifu_exu_alu_op_d                (ifu_exu_alu_op_d),
+      .ifu_exu_alu_a_pc_d              (ifu_exu_alu_a_pc_d),
       .ifu_exu_alu_c_d                 (ifu_exu_alu_c_d),
       .ifu_exu_alu_double_word_d       (ifu_exu_alu_double_word_d),
       .ifu_exu_alu_b_imm_d             (ifu_exu_alu_b_imm_d),
@@ -170,7 +173,6 @@ module c7bifu (
       .ifu_exu_lsu_vld_d               (ifu_exu_lsu_vld_d),
       .ifu_exu_lsu_op_d                (ifu_exu_lsu_op_d),
       .ifu_exu_lsu_double_read_d       (ifu_exu_lsu_double_read_d),
-      .ifu_exu_lsu_imm_shifted_d       (ifu_exu_lsu_imm_shifted_d),
 
       // bru
       .ifu_exu_bru_vld_d               (ifu_exu_bru_vld_d),

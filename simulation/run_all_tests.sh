@@ -2,13 +2,18 @@
 echo run tests
 echo
 
+
 cd test0_fcl
 echo "test0_fcl"
-if ./simulate.sh | grep PASS; then
-	printf ""
+result=$(./simulate.sh)
+if echo "$result" | grep "PASS"; then
+    printf "PASS!\n"
+elif echo "$result" | grep "FAIL"; then
+    printf "FAIL!\n"
+    exit 1
 else
-	printf "Fail!\n"
-	exit
+    printf "Unknown result\n"
+    exit 1
 fi
 echo ""
 cd ..
@@ -16,11 +21,15 @@ cd ..
 
 cd test1_ifu
 echo "test1_ifu"
-if ./simulate.sh | grep PASS; then
-	printf ""
+result=$(./simulate.sh)
+if echo "$result" | grep "PASS"; then
+    printf "PASS!\n"
+elif echo "$result" | grep "FAIL"; then
+    printf "FAIL!\n"
+    exit 1
 else
-	printf "Fail!\n"
-	exit
+    printf "Unknown result\n"
+    exit 1
 fi
 echo ""
 cd ..
@@ -28,23 +37,31 @@ cd ..
 
 cd test2_iq
 echo "test2_iq"
-if ./simulate.sh | grep PASS; then
-	printf ""
+result=$(./simulate.sh)
+if echo "$result" | grep "PASS"; then
+    printf "PASS!\n"
+elif echo "$result" | grep "FAIL"; then
+    printf "FAIL!\n"
+    exit 1
 else
-	printf "Fail!\n"
-	exit
+    printf "Unknown result\n"
+    exit 1
 fi
 echo ""
 cd ..
 
 
 cd test3_ifu_dataflow
-echo "test3_ifu_dataflow"
-if ./simulate.sh | grep PASS; then
-	printf ""
+echo "test3_ifu_data_flow"
+result=$(./simulate.sh)
+if echo "$result" | grep "PASS"; then
+    printf "PASS!\n"
+elif echo "$result" | grep "FAIL"; then
+    printf "FAIL!\n"
+    exit 1
 else
-	printf "Fail!\n"
-	exit
+    printf "Unknown result\n"
+    exit 1
 fi
 echo ""
 cd ..
@@ -52,11 +69,15 @@ cd ..
 
 cd test4_dec
 echo "test4_dec"
-if ./simulate.sh | grep PASS; then
-	printf ""
+result=$(./simulate.sh)
+if echo "$result" | grep "PASS"; then
+    printf "PASS!\n"
+elif echo "$result" | grep "FAIL"; then
+    printf "FAIL!\n"
+    exit 1
 else
-	printf "Fail!\n"
-	exit
+    printf "Unknown result\n"
+    exit 1
 fi
 echo ""
 cd ..
@@ -64,11 +85,15 @@ cd ..
 
 cd test5_ifu_flush_stall
 echo "test5_ifu_flush_stall"
-if ./simulate.sh | grep PASS; then
-	printf ""
+result=$(./simulate.sh)
+if echo "$result" | grep "PASS"; then
+    printf "PASS!\n"
+elif echo "$result" | grep "FAIL"; then
+    printf "FAIL!\n"
+    exit 1
 else
-	printf "Fail!\n"
-	exit
+    printf "Unknown result\n"
+    exit 1
 fi
 echo ""
 cd ..

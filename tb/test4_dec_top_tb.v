@@ -26,15 +26,16 @@ module top_tb();
     wire [4:0]  ifu_exu_rs2_d;
     wire [4:0]  ifu_exu_rd_d;
     wire        ifu_exu_wen_d;
+    wire [31:0] ifu_exu_imm_shifted_d;
     wire        ifu_exu_alu_vld_d;
     wire [5:0]  ifu_exu_alu_op_d;
+    wire        ifu_exu_alu_a_pc_d;
     wire [31:0] ifu_exu_alu_c_d;
     wire        ifu_exu_alu_double_word_d;
     wire        ifu_exu_alu_b_imm_d;
     wire        ifu_exu_lsu_vld_d;
     wire [6:0]  ifu_exu_lsu_op_d;
     wire        ifu_exu_lsu_double_read_d;
-    wire [31:0] ifu_exu_lsu_imm_shifted_d;
     wire        ifu_exu_bru_vld_d;
     wire [3:0]  ifu_exu_bru_op_d;
     wire [31:0] ifu_exu_bru_offset_d;
@@ -83,15 +84,16 @@ module top_tb();
         .ifu_exu_rs2_d           (ifu_exu_rs2_d),
         .ifu_exu_rd_d            (ifu_exu_rd_d),
         .ifu_exu_wen_d           (ifu_exu_wen_d),
+        .ifu_exu_imm_shifted_d   (ifu_exu_imm_shifted_d),
         .ifu_exu_alu_vld_d       (ifu_exu_alu_vld_d),
         .ifu_exu_alu_op_d        (ifu_exu_alu_op_d),
+        .ifu_exu_alu_a_pc_d      (ifu_exu_alu_a_pc_d),
         .ifu_exu_alu_c_d         (ifu_exu_alu_c_d),
         .ifu_exu_alu_double_word_d (ifu_exu_alu_double_word_d),
         .ifu_exu_alu_b_imm_d     (ifu_exu_alu_b_imm_d),
         .ifu_exu_lsu_vld_d       (ifu_exu_lsu_vld_d),
         .ifu_exu_lsu_op_d        (ifu_exu_lsu_op_d),
         .ifu_exu_lsu_double_read_d (ifu_exu_lsu_double_read_d),
-        .ifu_exu_lsu_imm_shifted_d (ifu_exu_lsu_imm_shifted_d),
         .ifu_exu_bru_vld_d       (ifu_exu_bru_vld_d),
         .ifu_exu_bru_op_d        (ifu_exu_bru_op_d),
         .ifu_exu_bru_offset_d    (ifu_exu_bru_offset_d),
