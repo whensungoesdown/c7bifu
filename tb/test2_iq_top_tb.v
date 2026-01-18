@@ -22,6 +22,7 @@ end
 reg  [31:0] data_addr;
 reg  [63:0] data;
 reg         data_vld;
+reg  [31:0] start_addr;
 reg         stall;
 reg         flush;
 wire        iq_full;
@@ -36,6 +37,7 @@ c7bifu_iq dut (
     .data_addr   (data_addr),
     .data        (data),
     .data_vld    (data_vld),
+    .start_addr  (start_addr),
     .stall       (stall),
     .flush       (flush),
     .iq_full     (iq_full),
@@ -73,6 +75,7 @@ task reset_test;
         
         resetn = 1'b0;
         data_addr = 32'h0;
+        start_addr = 32'h0;
         data = 64'h0;
         data_vld = 1'b0;
         stall = 1'b0;
@@ -115,6 +118,7 @@ task write_packets;
         packets_written = 0;
         while (i < num_packets) begin
             data_addr = start_addr + (i * 8);
+            start_addr = start_addr + (i * 8);
             data = {32'h1000 + data_pattern + i, 32'h2000 + data_pattern + i};
             data_vld = 1'b1;
             
@@ -122,8 +126,8 @@ task write_packets;
             
             if (!iq_full) begin
                 packets_written = packets_written + 1;
-                $display("  Packet %0d written: Addr=0x%08h, Data=0x%016h", 
-                         i, data_addr, data);
+                $display("  Packet %0d written: DataAddr=0x%08h, StartAddr=0x%08h, Data=0x%016h", 
+                         i, data_addr, start_addr, data);
             end else begin
                 $display("  Queue FULL! Packet %0d not written", i);
                 data_vld = 1'b0;  // Stop writing when full
@@ -196,6 +200,7 @@ task test_queue_capacity;
         
         data_vld = 1'b1;
         data_addr = 32'h1000;
+        start_addr = 32'h1000;
         i = 0;
         expected_full_at = 2;  // Should be full after 2 writes
         
@@ -223,6 +228,7 @@ task test_queue_capacity;
             //@(posedge clk);
 
             data_addr = data_addr + 8;
+            start_addr = start_addr + 8;
             i = i + 1;
         end
         
@@ -349,6 +355,7 @@ task test_concurrent_operations;
                     data_addr = 32'h4000 + (i * 8);
                     data = {32'hC0000000 + i, 32'hD0000000 + i};
                     data_vld = 1'b1;
+                    start_addr = 32'h4000 + (i * 8);
                     @(posedge clk);
                     
                     if (iq_full) begin
@@ -394,6 +401,7 @@ initial begin
     data_addr = 32'h0;
     data = 64'h0;
     data_vld = 1'b0;
+    start_addr = 32'h0;
     stall = 1'b0;
     flush = 1'b0;
     

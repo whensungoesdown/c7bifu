@@ -130,9 +130,10 @@ module c7bifu (
    c7bifu_iq u_iq (
       .clk                             (clk),
       .resetn                          (resetn),
-      .data_addr                       (ifu_icu_addr_ic1),
+      .data_addr                       ({ifu_icu_addr_ic1[31:3], 3'b0}),
       .data                            (icu_ifu_data_ic2),
       .data_vld                        (icu_data_vld),
+      .start_addr                      (ifu_icu_addr_ic1),
       .stall                           (stall),
       .flush                           (flush),
       .iq_full                         (iq_full),
