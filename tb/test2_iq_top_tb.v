@@ -320,6 +320,10 @@ task test_stall_operation;
         stall = 1'b0;
 
         @(posedge clk);
+        @(posedge clk); // after stall, there is one cycle gap, it is acceptable
+	//   stall    : ----_______
+	//   inst_vld : _____--____
+	//
 
         if (!inst_vld) begin
             $display("  ERROR: No instruction read after releasing stall");

@@ -14,10 +14,9 @@ add wave -radix hex -position end  result:/top_tb/dut/rd_en
 add wave -radix hex -position end  result:/top_tb/dut/wr_en
 add wave -radix hex -position end  result:/top_tb/dut/stall
 add wave -radix hex -position end  result:/top_tb/dut/queue_empty
-add wave -radix hex -position end  result:/top_tb/dut/inst_addr_f
-add wave -radix hex -position end  result:/top_tb/dut/inst_f
-add wave -radix hex -position end  result:/top_tb/dut/inst_vld
+add wave -radix hex -position end  result:/top_tb/inst_vld
+add wave -radix hex -position end  result:/top_tb/inst_addr
 
 add wave -divider
 add wave -radix hex -position end  result:/top_tb/flush
-
+add wave -divider
