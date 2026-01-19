@@ -65,7 +65,7 @@ module c7bifu_fcl (
    assign addr_stall = icu_req_q; 
 
 
-   assign stall_pf = addr_stall | stall_f;
+   assign stall_pf = addr_stall | stall_f | iq_full;
    assign stall_f = data_stall & ~flush;
 
 
