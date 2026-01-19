@@ -85,12 +85,25 @@ module c7bifu (
    wire        inst_vld_f;
 
    wire stall;
+   wire stall_iq;
+   wire stall_dec;
    wire flush;
    wire iq_full;
 
    wire dec_exc_vld_d;
    wire [5:0] dec_exc_code_d;
    
+   // The stall_dec signal is asserted when exu_ifu_stall is active.
+   // Due to a one-cycle read delay in the instruction queue (IQ), the decode
+   // stage must predict whether the currently decoded instructions will cause
+   // a stall once they reach the execution (_e) stage.
+   // To prevent instructions from being lost (dropped), stall_dec is
+   // preemptively asserted one cycle earlier upon decoding CSR or LSU
+   // instructions.
+   // Additional instruction types may be added to this preemptive stall logic
+   // in the future.
+   assign stall_dec = stall;
+   assign stall_iq = stall | ifu_exu_csr_vld_d | ifu_exu_lsu_vld_d; 
 
    c7bifu_fcl u_fcl (
       .clk                             (clk),
@@ -134,7 +147,7 @@ module c7bifu (
       .data                            (icu_ifu_data_ic2),
       .data_vld                        (icu_data_vld),
       .start_addr                      (ifu_icu_addr_ic1),
-      .stall                           (stall),
+      .stall                           (stall_iq),
       .flush                           (flush),
       .iq_full                         (iq_full),
       .inst_addr                       (inst_addr_f),
@@ -147,7 +160,7 @@ module c7bifu (
       .clk                             (clk),
       .resetn                          (resetn),
       
-      .stall                           (stall),
+      .stall                           (stall_dec),
       .flush                           (flush),
 
       .inst_vld_f                      (inst_vld_f),
