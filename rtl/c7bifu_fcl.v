@@ -99,7 +99,7 @@ module c7bifu_fcl (
 		    & ~iq_full
 		    ; //& resetn_sync_q;
 
-   assign icu_req_in = (icu_req_q & ~icu_ifu_ack_ic1) | icu_req;
+   assign icu_req_in = (~icu_ifu_ack_ic1) & (icu_req | icu_req_q);
 
    dffrl_ns #(1) icu_req_reg (
       .din (icu_req_in),
