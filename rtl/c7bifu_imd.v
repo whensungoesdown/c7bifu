@@ -1,5 +1,5 @@
 `include "dec_defs.v"
-`include "alu_defs.v"
+`include "../../alu_defs.v"
 
 module c7bifu_imd(
    input  [31:0]                        inst,

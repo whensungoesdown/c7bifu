@@ -47,6 +47,7 @@ module c7bifu_fcl (
 
    wire data_cancel_in;
    wire data_cancel_q;
+   wire data_cancel_en;
 
 
    // Synchronizes resetn to clock domain, active for one cycle after resetn

@@ -1,7 +1,7 @@
 `include "dec_defs.v"
-`include "alu_defs.v"
-`include "c7blsu_defs.v"
-`include "bru_defs.v"
+`include "../../alu_defs.v"
+`include "../../c7blsu/rtl/c7blsu_defs.v"
+`include "../../bru_defs.v"
 
 module decoder (
     input  [31:0] inst,
