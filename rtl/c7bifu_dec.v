@@ -101,7 +101,9 @@ module c7bifu_dec (
    // EXU should conditionally process exceptions based on ifu_exu_exc_vld_d
    // Decoding exceptions are forwarded alongside other frontend exceptions
    // from ICU and BIU
-   wire alu_dispatch_d = ~op_d[`LLSU_RELATED] && ~op_d[`LBRU_RELATED] && ~op_d[`LMUL_RELATED] && ~op_d[`LDIV_RELATED] && ~op_d[`LCSR_RELATED];
+   //wire alu_dispatch_d = ~op_d[`LLSU_RELATED] && ~op_d[`LBRU_RELATED] && ~op_d[`LMUL_RELATED] && ~op_d[`LDIV_RELATED] && ~op_d[`LCSR_RELATED];
+   wire alu_dispatch_d = ~op_d[`LLSU_RELATED] && ~op_d[`LBRU_RELATED] && ~op_d[`LMUL_RELATED] && ~op_d[`LDIV_RELATED] && ~op_d[`LCSR_RELATED]
+                         && ~op_d[`LERET] && ~op_d[`LSYSCALL] && ~op_d[`LBREAK] && ~op_d[`LINE];
    wire lsu_dispatch_d = op_d[`LLSU_RELATED];
    wire bru_dispatch_d = op_d[`LBRU_RELATED];
    wire mul_dispatch_d = op_d[`LMUL_RELATED];
