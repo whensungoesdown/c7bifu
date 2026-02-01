@@ -88,6 +88,7 @@ module c7bifu (
    wire stall_iq;
    wire stall_dec;
    wire flush;
+   wire flush_dly1;
    wire iq_full;
 
    wire dec_exc_vld_d;
@@ -125,6 +126,7 @@ module c7bifu (
       .icu_data_vld                    (icu_data_vld),
       .stall                           (stall),
       .flush                           (flush),
+      .flush_dly1                      (flush_dly1),
       .iq_full                         (iq_full)
    );
 
@@ -136,8 +138,9 @@ module c7bifu (
                        {32{pf_addr_sel_brn}}  & exu_ifu_brn_addr |
                        {32{pf_addr_sel_isr}}  & exu_ifu_isr_addr |
                        {32{pf_addr_sel_ert}}  & exu_ifu_ert_addr;		      
-
-   assign ifu_icu_addr_ic1 = pf_addr_in;
+   // uty: test
+   //assign ifu_icu_addr_ic1 = pf_addr_in;
+   assign ifu_icu_addr_ic1 = pf_addr_q;
 
 
    c7bifu_iq u_iq (
@@ -148,7 +151,8 @@ module c7bifu (
       .data_vld                        (icu_data_vld),
       .start_addr                      (ifu_icu_addr_ic1),
       .stall                           (stall_iq),
-      .flush                           (flush),
+      //.flush                           (flush),
+      .flush                           (flush | flush_dly1), // because ifu_icu_addr_ic1 takes pf_addr_q install of pf_addr_in, there is 1 cycle delay, therefore the iq also needs to wait 1 cycel for the correct updated ifu_icu_addr_ic1
       .iq_full                         (iq_full),
       .inst_addr                       (inst_addr_f),
       .inst                            (inst_f),

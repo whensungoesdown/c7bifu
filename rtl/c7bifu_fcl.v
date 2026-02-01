@@ -21,6 +21,7 @@ module c7bifu_fcl (
 
    output             stall,
    output             flush,
+   output             flush_dly1,
    input              iq_full
 );
 
@@ -96,7 +97,8 @@ module c7bifu_fcl (
    // Fix: Keep stall_pf asserted during entire reset period
    //      Ensures 0x1C000000 is properly registered before any increment
                                 //& ~d_stall_in
-   assign icu_req = (( ~icu_req_q & ~d_stall_q) | flush)
+   //assign icu_req = (( ~icu_req_q & ~d_stall_q) | flush)
+   assign icu_req = (( ~icu_req_q & ~d_stall_in) | flush) // uty: test
 		    & ~iq_full
 		    ; //& resetn_sync_q;
 
@@ -108,7 +110,11 @@ module c7bifu_fcl (
       .rst_l (resetn),
       .q   (icu_req_q));
 
-   assign ifu_icu_req_ic1 = icu_req_q;
+   // When iq_full, ifu_icu_req_ic1 needs to cancel immediately
+   // if wait through the registers, then it will be late.
+   // Therefore, cancel ifu_icu_req_ic1 now.
+   //assign ifu_icu_req_ic1 = icu_req_q;
+   assign ifu_icu_req_ic1 = icu_req_q & ~iq_full;
 
 
    // icu_ifu_ack_ic1                     : _-_____
@@ -131,6 +137,7 @@ module c7bifu_fcl (
    //
    // pf_addr
    //
+   wire stall_pf_minus_data_vld = stall_pf & ~icu_data_vld;
 
    assign except = exu_ifu_except;
    assign branch = exu_ifu_branch;
@@ -138,15 +145,24 @@ module c7bifu_fcl (
 
    // addrs do not need a flush
    assign pf_addr_sel_init = ~resetn_sync_q;
-   assign pf_addr_sel_old = stall_pf & ~pf_addr_sel_init & ~pf_addr_sel_brn & ~pf_addr_sel_isr & ~pf_addr_sel_ert;
-   assign pf_addr_sel_inc = ~stall_pf & ~flush & ~pf_addr_sel_init;
+   //assign pf_addr_sel_old = stall_pf & ~pf_addr_sel_init & ~pf_addr_sel_brn & ~pf_addr_sel_isr & ~pf_addr_sel_ert;
+   //assign pf_addr_sel_old = stall_pf_minus_data_vld & ~pf_addr_sel_init & ~pf_addr_sel_brn & ~pf_addr_sel_isr & ~pf_addr_sel_ert;
+   //                       stall_pf here seems to be useless, review
+   //                          |
+   assign pf_addr_sel_old = stall_pf & ~pf_addr_sel_init & ~pf_addr_sel_brn & ~pf_addr_sel_isr & ~pf_addr_sel_ert & ~pf_addr_sel_inc;
+   //assign pf_addr_sel_inc = ~stall_pf & ~flush & ~pf_addr_sel_init;
+   //assign pf_addr_sel_inc = ~stall_pf_minus_data_vld & ~flush & ~pf_addr_sel_init;
+   assign pf_addr_sel_inc = ~stall_pf_minus_data_vld & ~flush & ~flush_dly1 & ~pf_addr_sel_init;
 
    // addrs need flush
    assign pf_addr_sel_brn = branch;
    assign pf_addr_sel_isr = except;
    assign pf_addr_sel_ert = ertn;
 
-   assign pf_addr_en = ~stall_pf | flush;
+   //assign pf_addr_en = ~stall_pf | flush;
+   //wire data_vld = stall_pf ? icu_data_vld : 1'b0;
+   //assign pf_addr_en = ~stall_pf | icu_data_vld | flush;
+   assign pf_addr_en = pf_addr_sel_init | icu_data_vld | flush;
 
 
    //
@@ -161,7 +177,12 @@ module c7bifu_fcl (
    // If except and icu_ifu_data_valid_ic2 occur in the same cycle,
    // data_cancel_q will NOT be set.
    //assign data_cancel_in = (data_stall & except) & ~icu_ifu_data_valid_ic2;
-   assign data_cancel_in = (data_stall & flush) & ~icu_ifu_data_valid_ic2;
+   //assign data_cancel_in = (data_stall & flush) & ~icu_ifu_data_valid_ic2;
+   // another situation is that right at the flush cycle, ifu_icu_req_ic1
+   // & icu_ifu_ack_ic1 both 1, it is the very begining of a icu data fetch,
+   // (data_stall not started yet, or the next cycle, icache hit,
+   // icu_ifu_data_valid_ic2 asserted)
+   assign data_cancel_in = ((data_stall | icu_ifu_ack_ic1) & flush) & ~icu_ifu_data_valid_ic2;
    assign data_cancel_en = flush | icu_ifu_data_valid_ic2;
 
    assign icu_data_vld = icu_ifu_data_valid_ic2 & ~data_cancel_q;
@@ -185,5 +206,10 @@ module c7bifu_fcl (
       .rst_l (resetn),
       .en (data_cancel_en),
       .q   (data_cancel_q));
+
+   dff_ns #(1) flush_dly1_reg (
+      .din (flush),
+      .clk (clk),
+      .q   (flush_dly1));
 
 endmodule
