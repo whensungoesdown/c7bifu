@@ -416,6 +416,8 @@ task test_exception_flow;
         exu_ifu_except = 1'b0;
         exu_ifu_isr_addr = 32'h0;
         
+        @(posedge clk);
+
         // Verify flush occurs and new fetch starts at ISR address
         wait_for_fetch_request(32'h80000000);
         fetch_request_count = fetch_request_count + 1;
@@ -482,6 +484,8 @@ task test_branch_flow;
         @(posedge clk);
         exu_ifu_branch = 1'b0;
         exu_ifu_brn_addr = 32'h0;
+
+        @(posedge clk);
         
         // Verify flush occurs and new fetch starts at branch target
         wait_for_fetch_request(32'h40001000);
@@ -521,6 +525,8 @@ task test_ertn_flow;
         exu_ifu_except = 1'b0;
         exu_ifu_isr_addr = 32'h0;
         
+        @(posedge clk);
+
         // Wait for fetch request to ISR
         wait_for_fetch_request(32'h80000000);
         fetch_request_count = fetch_request_count + 1;
@@ -544,6 +550,8 @@ task test_ertn_flow;
         exu_ifu_ertn = 1'b0;
         exu_ifu_ert_addr = 32'h0;
         
+        @(posedge clk);
+
         // Verify flush occurs and fetch resumes at return address
         wait_for_fetch_request(32'h1C000010);
         fetch_request_count = fetch_request_count + 1;
@@ -599,6 +607,8 @@ task test_concurrent_events;
         @(posedge clk);
         icu_ifu_data_valid_ic2 = 1'b0;
         
+        @(posedge clk);
+
         // Verify fetch redirects to ISR
         wait_for_fetch_request(32'h90000000);
         fetch_request_count = fetch_request_count + 1;
@@ -620,6 +630,8 @@ task test_concurrent_events;
         exu_ifu_branch = 1'b0;
         exu_ifu_brn_addr = 32'h0;
         
+        @(posedge clk);
+
         // Verify fetch redirects to branch target
         wait_for_fetch_request(32'h50000000);
         fetch_request_count = fetch_request_count + 1;
