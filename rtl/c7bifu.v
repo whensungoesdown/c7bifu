@@ -2,11 +2,22 @@ module c7bifu (
    input              clk,
    input              resetn,
 
+   input              ic_en,
+
+   // icu interface
    output [31:0]      ifu_icu_addr_ic1,
    output             ifu_icu_req_ic1,
    input              icu_ifu_ack_ic1,
    input              icu_ifu_data_valid_ic2,
    input  [63:0]      icu_ifu_data_ic2,
+
+   // biu interface
+   output [31:0]      ifu_biu_rd_addr,
+   output             ifu_biu_rd_req,
+   input              biu_ifu_rd_ack,
+   input              biu_ifu_data_valid,
+   input  [63:0]      biu_ifu_data,
+
    input              exu_ifu_except,
    input  [31:0]      exu_ifu_isr_addr,
    input              exu_ifu_branch,
@@ -63,6 +74,10 @@ module c7bifu (
    output [5:0]       ifu_exu_exc_code_d
 );
 
+   wire [63:0] data;
+   wire data_vld;
+   wire ack;
+
    wire [31:0] pf_addr_in;
    wire [31:0] pf_addr_q;
    wire [31:0] pf_addr_inc;
@@ -78,7 +93,8 @@ module c7bifu (
    wire pf_addr_sel_ert;
 
    wire pf_addr_en;
-   wire icu_data_vld;
+   //wire icu_data_vld;
+   wire fcl_data_vld;
 
    wire [31:0] inst_addr_f;
    wire [31:0] inst_f;
@@ -106,12 +122,20 @@ module c7bifu (
    assign stall_dec = stall;
    assign stall_iq = stall | ifu_exu_csr_vld_d | ifu_exu_lsu_vld_d; 
 
+   wire fcl_req;
+   assign ifu_icu_req_ic1 = fcl_req & ic_en;
+   assign ifu_biu_rd_req = fcl_req & ~ic_en;
+
+   assign ack = ic_en ? icu_ifu_ack_ic1 : biu_ifu_rd_ack;
+   assign data = ic_en ? icu_ifu_data_ic2 : biu_ifu_data;
+   assign data_vld = ic_en ? icu_ifu_data_valid_ic2 : biu_ifu_data_valid;
+
    c7bifu_fcl u_fcl (
       .clk                             (clk),
       .resetn                          (resetn),
-      .ifu_icu_req_ic1                 (ifu_icu_req_ic1),
-      .icu_ifu_ack_ic1                 (icu_ifu_ack_ic1),
-      .icu_ifu_data_valid_ic2          (icu_ifu_data_valid_ic2),
+      .fcl_req                         (fcl_req),
+      .ack                             (ack),
+      .data_vld                        (data_vld),
       .exu_ifu_except                  (exu_ifu_except),
       .exu_ifu_branch                  (exu_ifu_branch),
       .exu_ifu_ertn                    (exu_ifu_ertn),
@@ -123,7 +147,7 @@ module c7bifu (
       .pf_addr_sel_isr                 (pf_addr_sel_isr),
       .pf_addr_sel_ert                 (pf_addr_sel_ert),
       .pf_addr_en                      (pf_addr_en),
-      .icu_data_vld                    (icu_data_vld),
+      .fcl_data_vld                    (fcl_data_vld),
       .stall                           (stall),
       .flush                           (flush),
       .flush_dly1                      (flush_dly1),
@@ -140,16 +164,24 @@ module c7bifu (
                        {32{pf_addr_sel_ert}}  & exu_ifu_ert_addr;		      
    // uty: test
    //assign ifu_icu_addr_ic1 = pf_addr_in;
-   assign ifu_icu_addr_ic1 = pf_addr_q;
+   //assign ifu_icu_addr_ic1 = pf_addr_q;
+   assign ifu_icu_addr_ic1 = pf_addr_q & {32{ic_en}};
+   assign ifu_biu_rd_addr = pf_addr_q & {32{~ic_en}};
 
+   wire [31:0] iq_start_addr = ic_en ? ifu_icu_addr_ic1 : ifu_biu_rd_addr;
+   wire [31:0] iq_data_addr = {iq_start_addr[31:3], 3'b0};
 
    c7bifu_iq u_iq (
       .clk                             (clk),
       .resetn                          (resetn),
-      .data_addr                       ({ifu_icu_addr_ic1[31:3], 3'b0}),
-      .data                            (icu_ifu_data_ic2),
-      .data_vld                        (icu_data_vld),
-      .start_addr                      (ifu_icu_addr_ic1),
+      //.data_addr                       ({ifu_icu_addr_ic1[31:3], 3'b0}),
+      .data_addr                       (iq_data_addr),
+      //.data                            (icu_ifu_data_ic2),
+      .data                            (data),
+      //.data_vld                        (icu_data_vld),
+      .data_vld                        (fcl_data_vld),
+      //.start_addr                      (ifu_icu_addr_ic1),
+      .start_addr                      (iq_start_addr),
       .stall                           (stall_iq),
       //.flush                           (flush),
       .flush                           (flush | flush_dly1), // because ifu_icu_addr_ic1 takes pf_addr_q install of pf_addr_in, there is 1 cycle delay, therefore the iq also needs to wait 1 cycel for the correct updated ifu_icu_addr_ic1

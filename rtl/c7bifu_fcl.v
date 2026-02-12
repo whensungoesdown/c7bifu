@@ -1,9 +1,9 @@
 module c7bifu_fcl (
    input              clk,
    input              resetn,
-   output             ifu_icu_req_ic1,
-   input              icu_ifu_ack_ic1,
-   input              icu_ifu_data_valid_ic2,
+   output             fcl_req,
+   input              ack,
+   input              data_vld,
    input              exu_ifu_except,
    input              exu_ifu_branch,
    input              exu_ifu_ertn,
@@ -17,7 +17,7 @@ module c7bifu_fcl (
    output             pf_addr_sel_ert,
 
    output             pf_addr_en,
-   output             icu_data_vld,
+   output             fcl_data_vld,
 
    output             stall,
    output             flush,
@@ -35,9 +35,9 @@ module c7bifu_fcl (
    wire stall_pf;
    wire stall_f;
 
-   wire icu_req;
-   wire icu_req_in;
-   wire icu_req_q;
+   wire req;
+   wire req_in;
+   wire req_q;
 
    wire d_stall_in;
    wire d_stall_q;
@@ -64,18 +64,18 @@ module c7bifu_fcl (
 
    assign flush = except | branch | ertn;
 
-   assign addr_stall = icu_req_q; 
+   assign addr_stall = req_q; 
 
 
    assign stall_pf = addr_stall | stall_f | iq_full;
    assign stall_f = data_stall & ~flush;
 
 
-   // icu_req                             : --_____
-   // icu_ifu_ack_ic1                     : _____-_
+   // req                             : --_____
+   // ack                             : _____-_
    //
-   // icu_req_in                          : _----__
-   // icu_req_q                           : __----_
+   // req_in                          : _----__
+   // req_q                           : __----_
 
    // Problem with using d_stall_in:
    // - addr_stall and data_stall would become sequential (back-to-back)
@@ -97,33 +97,33 @@ module c7bifu_fcl (
    // Fix: Keep stall_pf asserted during entire reset period
    //      Ensures 0x1C000000 is properly registered before any increment
                                 //& ~d_stall_in
-   //assign icu_req = (( ~icu_req_q & ~d_stall_q) | flush)
-   assign icu_req = (( ~icu_req_q & ~d_stall_in) | flush) // uty: test
+   //assign req = (( ~req_q & ~d_stall_q) | flush)
+   assign req = (( ~req_q & ~d_stall_in) | flush) // uty: test
 		    & ~iq_full
 		    ; //& resetn_sync_q;
 
-   assign icu_req_in = (~icu_ifu_ack_ic1) & (icu_req | icu_req_q);
+   assign req_in = (~ack) & (req | req_q);
 
-   dffrl_ns #(1) icu_req_reg (
-      .din (icu_req_in),
+   dffrl_ns #(1) req_reg (
+      .din (req_in),
       .clk (clk),
       .rst_l (resetn),
-      .q   (icu_req_q));
+      .q   (req_q));
 
-   // When iq_full, ifu_icu_req_ic1 needs to cancel immediately
+   // When iq_full, fcl_req needs to cancel immediately
    // if wait through the registers, then it will be late.
-   // Therefore, cancel ifu_icu_req_ic1 now.
-   //assign ifu_icu_req_ic1 = icu_req_q;
-   assign ifu_icu_req_ic1 = icu_req_q & ~iq_full;
+   // Therefore, cancel fcl_req now.
+   //assign fcl_req = req_q;
+   assign fcl_req = req_q & ~iq_full;
 
 
-   // icu_ifu_ack_ic1                     : _-_____
-   // icu_ifu_data_valid_ic2              : _____-_
+   // ack                                 : _-_____
+   // data_vld                            : _____-_
    //
    // d_stall_in                          : _----__
    // d_stall_q                           : __----_
 
-   assign d_stall_in = (d_stall_q & ~icu_ifu_data_valid_ic2) | icu_ifu_ack_ic1;
+   assign d_stall_in = (d_stall_q & ~data_vld) | ack;
 
    dffrl_ns #(1) d_stall_reg (
       .din (d_stall_in),
@@ -137,7 +137,7 @@ module c7bifu_fcl (
    //
    // pf_addr
    //
-   wire stall_pf_minus_data_vld = stall_pf & ~icu_data_vld;
+   wire stall_pf_minus_data_vld = stall_pf & ~fcl_data_vld;
 
    assign except = exu_ifu_except;
    assign branch = exu_ifu_branch;
@@ -160,9 +160,9 @@ module c7bifu_fcl (
    assign pf_addr_sel_ert = ertn;
 
    //assign pf_addr_en = ~stall_pf | flush;
-   //wire data_vld = stall_pf ? icu_data_vld : 1'b0;
-   //assign pf_addr_en = ~stall_pf | icu_data_vld | flush;
-   assign pf_addr_en = pf_addr_sel_init | icu_data_vld | flush;
+   //wire data_vld = stall_pf ? fcl_data_vld : 1'b0;
+   //assign pf_addr_en = ~stall_pf | fcl_data_vld | flush;
+   assign pf_addr_en = pf_addr_sel_init | fcl_data_vld | flush;
 
 
    //
@@ -170,22 +170,22 @@ module c7bifu_fcl (
    //
    // When an exception occurs during a data stall (data_stall == 1), set
    // data_cancel_q to 1.
-   // This flag will cancel the next arriving icu_ifu_data_valid_ic2 signal,
+   // This flag will cancel the next arriving data_vld signal,
    // preventing invalid instruction data from being processed.
    //
-   // Note: icu_ifu_data_valid_ic2 clears data_cancel_q when it arrives.
-   // If except and icu_ifu_data_valid_ic2 occur in the same cycle,
+   // Note: data_vld clears data_cancel_q when it arrives.
+   // If except and data_vld occur in the same cycle,
    // data_cancel_q will NOT be set.
-   //assign data_cancel_in = (data_stall & except) & ~icu_ifu_data_valid_ic2;
-   //assign data_cancel_in = (data_stall & flush) & ~icu_ifu_data_valid_ic2;
-   // another situation is that right at the flush cycle, ifu_icu_req_ic1
-   // & icu_ifu_ack_ic1 both 1, it is the very begining of a icu data fetch,
+   //assign data_cancel_in = (data_stall & except) & ~data_vld;
+   //assign data_cancel_in = (data_stall & flush) & ~data_vld;
+   // another situation is that right at the flush cycle, fcl_req
+   // & ack both 1, it is the very begining of a icu data fetch,
    // (data_stall not started yet, or the next cycle, icache hit,
-   // icu_ifu_data_valid_ic2 asserted)
-   assign data_cancel_in = ((data_stall | icu_ifu_ack_ic1) & flush) & ~icu_ifu_data_valid_ic2;
-   assign data_cancel_en = flush | icu_ifu_data_valid_ic2;
+   // data_vld asserted)
+   assign data_cancel_in = ((data_stall | ack) & flush) & ~data_vld;
+   assign data_cancel_en = flush | data_vld;
 
-   assign icu_data_vld = icu_ifu_data_valid_ic2 & ~data_cancel_q;
+   assign fcl_data_vld = data_vld & ~data_cancel_q;
 
    assign stall = exu_ifu_stall;
 
