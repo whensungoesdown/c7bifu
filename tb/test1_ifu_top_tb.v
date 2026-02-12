@@ -7,6 +7,8 @@ module top_tb();
     reg resetn;
     reg icu_ifu_ack_ic1;          // 添加ACK输入
     reg icu_ifu_data_valid_ic2;
+    reg biu_ifu_rd_ack;
+    reg biu_ifu_data_valid;
     reg exu_ifu_except;
     reg exu_ifu_branch;
     reg exu_ifu_ertn;
@@ -19,7 +21,9 @@ module top_tb();
     // Output signals
     wire [31:0] ifu_icu_addr_ic1;
     wire ifu_icu_req_ic1;
-    wire icu_data_vld;            // NEW: icu_data_vld output signal
+    wire [31:0] ifu_biu_rd_addr;
+    wire ifu_biu_rd_req;
+    wire fcl_data_vld;            // NEW: fcl_data_vld output signal
     
     // Internal signals from c7bifu
     wire [31:0] pf_addr_q;
@@ -43,7 +47,7 @@ module top_tb();
     reg [179:0] wave_req;
     reg [179:0] wave_ack;          // 添加ACK波形
     reg [179:0] wave_valid;
-    reg [179:0] wave_data_vld;     // NEW: icu_data_vld waveform
+    reg [179:0] wave_data_vld;     // NEW: fcl_data_vld waveform
     reg [179:0] wave_except;
     reg [179:0] wave_branch;
     reg [179:0] wave_ertn;
@@ -71,10 +75,17 @@ module top_tb();
     c7bifu dut (
         .clk(clk),
         .resetn(resetn),
+
+	.ic_en(1'b1),
+
         .ifu_icu_addr_ic1(ifu_icu_addr_ic1),
         .ifu_icu_req_ic1(ifu_icu_req_ic1),
 	.icu_ifu_ack_ic1(icu_ifu_ack_ic1),
         .icu_ifu_data_valid_ic2(icu_ifu_data_valid_ic2),
+
+        .biu_ifu_rd_ack(biu_ifu_rd_ack),
+        .biu_ifu_data_valid(biu_ifu_data_valid),
+
         .exu_ifu_except(exu_ifu_except),
         .exu_ifu_isr_addr(exu_ifu_isr_addr),
         .exu_ifu_branch(exu_ifu_branch),
@@ -102,7 +113,7 @@ module top_tb();
             wave_req      <= {wave_req[178:0], (ifu_icu_req_ic1 ? "-" : "_")};
             wave_ack      <= {wave_ack[178:0], (icu_ifu_ack_ic1 ? "-" : "_")};
             wave_valid    <= {wave_valid[178:0], (icu_ifu_data_valid_ic2 ? "-" : "_")};
-            wave_data_vld <= {wave_data_vld[178:0], (icu_data_vld ? "-" : "_")}; // NEW: Add icu_data_vld to waveform
+            wave_data_vld <= {wave_data_vld[178:0], (fcl_data_vld ? "-" : "_")}; // NEW: Add fcl_data_vld to waveform
             wave_except   <= {wave_except[178:0], (exu_ifu_except ? "-" : "_")};
             wave_branch   <= {wave_branch[178:0], (exu_ifu_branch ? "-" : "_")};
             wave_ertn     <= {wave_ertn[178:0], (exu_ifu_ertn ? "-" : "_")};
@@ -222,7 +233,7 @@ module top_tb();
         wave_req = "";
         wave_ack = "";
         wave_valid = "";
-        wave_data_vld = ""; // NEW: Initialize icu_data_vld waveform string
+        wave_data_vld = ""; // NEW: Initialize fcl_data_vld waveform string
         wave_except = "";
         wave_branch = "";
         wave_ertn = "";
@@ -245,18 +256,12 @@ module top_tb();
         repeat(2) @(posedge clk);
 
         // Run test cases
-//        test_reset_sequence();
         
         // 测试不同ACK模式
         test_normal_increment_flow_long_cycle_ack_long_dvalid();
         test_normal_increment_flow_next_cycle_ack();  // 下一周期ACK
         test_normal_increment_flow_same_cycle_ack();  // 同一周期ACK
         
-//        test_mixed_ack_modes();  // 混合ACK模式
-        
-        // 中断测试（使用同一周期ACK）
-//        ack_mode = 1'b1;
-//        test_branch_interrupt();
 
         test_exception_interrupt_no_datacancel();
         test_exception_interrupt_datacancel();
@@ -267,8 +272,6 @@ module top_tb();
         test_ertn_no_datacancel();
         test_ertn_datacancel();
 
-//        
-//        test_back_to_back_requests();
 
         // Print final test results
         print_final_results();
@@ -286,7 +289,7 @@ module top_tb();
         begin
             $display("Time=%t, Clock Edge=%0d | resetn=%b | req=%b | ack=%b | valid=%b | data_vld=%b | except=%b | branch=%b | ertn=%b", // MODIFIED: Added data_vld
                      $time, clk_edge_count, resetn, ifu_icu_req_ic1, icu_ifu_ack_ic1,
-                     icu_ifu_data_valid_ic2, icu_data_vld, exu_ifu_except, exu_ifu_branch, exu_ifu_ertn); // MODIFIED: Added icu_data_vld
+                     icu_ifu_data_valid_ic2, fcl_data_vld, exu_ifu_except, exu_ifu_branch, exu_ifu_ertn); // MODIFIED: Added fcl_data_vld
             $display("                    | pf_addr=0x%h | ifu_addr=0x%h", 
                      pf_addr_q, ifu_icu_addr_ic1);
             $display("                    | pf_init=%b | pf_old=%b | pf_inc=%b | pf_brn=%b | pf_isr=%b | pf_ert=%b | pf_en=%b",
@@ -311,7 +314,7 @@ module top_tb();
             wave_req = "";
             wave_ack = "";
             wave_valid = "";
-            wave_data_vld = ""; // NEW: Reset icu_data_vld waveform string
+            wave_data_vld = ""; // NEW: Reset fcl_data_vld waveform string
             wave_except = "";
             wave_branch = "";
             wave_ertn = "";
@@ -341,7 +344,7 @@ module top_tb();
             $display("req      : %s", wave_req);
             $display("ack      : %s", wave_ack);
             $display("valid    : %s", wave_valid);
-            $display("data_vld : %s", wave_data_vld); // NEW: Display icu_data_vld waveform
+            $display("data_vld : %s", wave_data_vld); // NEW: Display fcl_data_vld waveform
             $display("except   : %s", wave_except);
             $display("branch   : %s", wave_branch);
             $display("ertn     : %s", wave_ertn);
@@ -914,6 +917,7 @@ module top_tb();
             exu_ifu_isr_addr = 32'h1c000100; // Exception handler
             
             @(posedge clk);
+            @(posedge clk);
             print_realtime_waveform();
             
             // Check exception address is selected
@@ -939,8 +943,8 @@ module top_tb();
             // Simulate data valid for exception handler
             generate_data_valid();
 
-	    if (icu_data_vld !== 1'b1) begin
-                $display("ERROR: icu_data_vld should be 1 after ERTN data valid");
+	    if (fcl_data_vld !== 1'b1) begin
+                $display("ERROR: fcl_data_vld should be 1 after ERTN data valid");
                 passed = 1'b0;
             end
             
@@ -1018,8 +1022,8 @@ module top_tb();
 	    // data_valid for the previous 0x1c000008
             generate_data_valid_longcycle();
 
-	    if (icu_data_vld === 1'b1) begin
-                $display("ERROR: icu_data_vld should not be 1 because data for 0x1c000008 is canceled");
+	    if (fcl_data_vld === 1'b1) begin
+                $display("ERROR: fcl_data_vld should not be 1 because data for 0x1c000008 is canceled");
                 passed = 1'b0;
             end
             
@@ -1035,11 +1039,11 @@ module top_tb();
             // Simulate data valid for exception handler
             generate_data_valid();
 
-	    if (icu_data_vld !== 1'b1) begin
-                $display("ERROR: icu_data_vld should be 1 after data valid");
+	    if (fcl_data_vld !== 1'b1) begin
+                $display("ERROR: fcl_data_vld should be 1 after data valid");
                 passed = 1'b0;
 	    end else begin
-                $display("OK: icu_data_vld is 1 after data valid for 0x1c000100");
+                $display("OK: fcl_data_vld is 1 after data valid for 0x1c000100");
                 passed = 1'b1;
 	    end
             
@@ -1103,6 +1107,7 @@ module top_tb();
             exu_ifu_brn_addr = 32'h1c000200; // Branch-to address
             
             @(posedge clk);
+            @(posedge clk);
             print_realtime_waveform();
             
             // Check branch address is selected
@@ -1128,8 +1133,8 @@ module top_tb();
             // Simulate data valid for branch address
             generate_data_valid();
 
-	    if (icu_data_vld !== 1'b1) begin
-                $display("ERROR: icu_data_vld should be 1 after branch address data valid");
+	    if (fcl_data_vld !== 1'b1) begin
+                $display("ERROR: fcl_data_vld should be 1 after branch address data valid");
                 passed = 1'b0;
             end
             
@@ -1207,8 +1212,8 @@ module top_tb();
 	    // data_valid for the previous 0x1c000008
             generate_data_valid_longcycle();
 
-	    if (icu_data_vld === 1'b1) begin
-                $display("ERROR: icu_data_vld should not be 1 because data for 0x1c000008 is canceled");
+	    if (fcl_data_vld === 1'b1) begin
+                $display("ERROR: fcl_data_vld should not be 1 because data for 0x1c000008 is canceled");
                 passed = 1'b0;
             end
             
@@ -1224,11 +1229,11 @@ module top_tb();
             // Simulate data valid for branch fetch data
             generate_data_valid();
 
-	    if (icu_data_vld !== 1'b1) begin
-                $display("ERROR: icu_data_vld should be 1 after data valid");
+	    if (fcl_data_vld !== 1'b1) begin
+                $display("ERROR: fcl_data_vld should be 1 after data valid");
                 passed = 1'b0;
 	    end else begin
-                $display("OK: icu_data_vld is 1 after data valid for 0x1c000200");
+                $display("OK: fcl_data_vld is 1 after data valid for 0x1c000200");
                 passed = 1'b1;
 	    end
             
@@ -1292,6 +1297,7 @@ module top_tb();
             exu_ifu_ert_addr = 32'h1c000300; // ertn address
             
             @(posedge clk);
+            @(posedge clk);
             print_realtime_waveform();
             
             // Check ertn address is selected
@@ -1317,8 +1323,8 @@ module top_tb();
             // Simulate data valid for ertn address
             generate_data_valid();
 
-	    if (icu_data_vld !== 1'b1) begin
-                $display("ERROR: icu_data_vld should be 1 after ertn address data valid");
+	    if (fcl_data_vld !== 1'b1) begin
+                $display("ERROR: fcl_data_vld should be 1 after ertn address data valid");
                 passed = 1'b0;
             end
             
@@ -1396,8 +1402,8 @@ module top_tb();
 	    // data_valid for the previous 0x1c000008
             generate_data_valid_longcycle();
 
-	    if (icu_data_vld === 1'b1) begin
-                $display("ERROR: icu_data_vld should not be 1 because data for 0x1c000008 is canceled");
+	    if (fcl_data_vld === 1'b1) begin
+                $display("ERROR: fcl_data_vld should not be 1 because data for 0x1c000008 is canceled");
                 passed = 1'b0;
             end
             
@@ -1413,11 +1419,11 @@ module top_tb();
             // Simulate data valid for ertn fetch data
             generate_data_valid();
 
-	    if (icu_data_vld !== 1'b1) begin
-                $display("ERROR: icu_data_vld should be 1 after data valid");
+	    if (fcl_data_vld !== 1'b1) begin
+                $display("ERROR: fcl_data_vld should be 1 after data valid");
                 passed = 1'b0;
 	    end else begin
-                $display("OK: icu_data_vld is 1 after data valid for 0x1c000300");
+                $display("OK: fcl_data_vld is 1 after data valid for 0x1c000300");
                 passed = 1'b1;
 	    end
             
@@ -1506,7 +1512,7 @@ module top_tb();
             $display("Time=%t | clk_edge=%0d", $time, clk_edge_count);
             $display("  Control: resetn=%b, req=%b, ack=%b, valid=%b, data_vld=%b, except=%b, branch=%b, ertn=%b", // MODIFIED: Added data_vld
                      resetn, ifu_icu_req_ic1, icu_ifu_ack_ic1,
-                     icu_ifu_data_valid_ic2, icu_data_vld, exu_ifu_except, exu_ifu_branch, exu_ifu_ertn); // MODIFIED: Added icu_data_vld
+                     icu_ifu_data_valid_ic2, fcl_data_vld, exu_ifu_except, exu_ifu_branch, exu_ifu_ertn); // MODIFIED: Added fcl_data_vld
             $display("  Address: pf_addr=0x%h, ifu_addr=0x%h", 
                      pf_addr_q, ifu_icu_addr_ic1);
         end
@@ -1568,6 +1574,6 @@ module top_tb();
     assign pf_addr_sel_isr = dut.pf_addr_sel_isr;
     assign pf_addr_sel_ert = dut.pf_addr_sel_ert;
     assign pf_addr_en = dut.pf_addr_en;
-    assign icu_data_vld = dut.icu_data_vld; // NEW: Connect icu_data_vld signal from DUT
+    assign fcl_data_vld = dut.fcl_data_vld; // NEW: Connect fcl_data_vld signal from DUT
 
 endmodule

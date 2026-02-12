@@ -5,14 +5,14 @@ module top_tb();
     // Input signals
     reg clk;
     reg resetn;
-    reg icu_ifu_ack_ic1;
-    reg icu_ifu_data_valid_ic2;
+    reg ack;
+    reg data_vld;
     reg exu_ifu_except;
     reg exu_ifu_branch;    // New input: branch signal
     reg exu_ifu_ertn;      // New input: ertn signal
 
     // Output signals
-    wire ifu_icu_req_ic1;
+    wire fcl_req;
     wire pf_addr_sel_init;  // New output: prefetch address select init
     wire pf_addr_sel_old;   // New output: prefetch address select old/stall
     wire pf_addr_sel_inc;   // New output: prefetch address select increment
@@ -57,9 +57,9 @@ module top_tb();
     c7bifu_fcl uut (
         .clk(clk),
         .resetn(resetn),
-        .ifu_icu_req_ic1(ifu_icu_req_ic1),
-        .icu_ifu_ack_ic1(icu_ifu_ack_ic1),
-        .icu_ifu_data_valid_ic2(icu_ifu_data_valid_ic2),
+        .fcl_req(fcl_req),
+        .ack(ack),
+        .data_vld(data_vld),
         .exu_ifu_except(exu_ifu_except),
         .exu_ifu_branch(exu_ifu_branch),
         .exu_ifu_ertn(exu_ifu_ertn),
@@ -91,9 +91,9 @@ module top_tb();
             // Basic signals
             wave_clk = {wave_clk[78:0], "^"};
             wave_resetn = {wave_resetn[78:0], resetn ? "-" : "_"};
-            wave_req = {wave_req[78:0], ifu_icu_req_ic1 ? "-" : "_"};
-            wave_ack = {wave_ack[78:0], icu_ifu_ack_ic1 ? "-" : "_"};
-            wave_valid = {wave_valid[78:0], icu_ifu_data_valid_ic2 ? "-" : "_"};
+            wave_req = {wave_req[78:0], fcl_req ? "-" : "_"};
+            wave_ack = {wave_ack[78:0], ack ? "-" : "_"};
+            wave_valid = {wave_valid[78:0], data_vld ? "-" : "_"};
             wave_except = {wave_except[78:0], exu_ifu_except ? "-" : "_"};
             wave_branch = {wave_branch[78:0], exu_ifu_branch ? "-" : "_"};
             wave_ertn = {wave_ertn[78:0], exu_ifu_ertn ? "-" : "_"};
@@ -115,8 +115,8 @@ module top_tb();
     initial begin
         clk = 0;
         resetn = 0;
-        icu_ifu_ack_ic1 = 0;
-        icu_ifu_data_valid_ic2 = 0;
+        ack = 0;
+        data_vld = 0;
         exu_ifu_except = 0;
         exu_ifu_branch = 0;
         exu_ifu_ertn = 0;
@@ -214,8 +214,8 @@ module top_tb();
     task print_realtime_waveform;
         begin
             $display("Time=%t, Clock Edge=%0d | resetn=%b | req=%b | ack=%b | valid=%b | except=%b | branch=%b | ertn=%b",
-                     $time, clk_edge_count, resetn, ifu_icu_req_ic1, icu_ifu_ack_ic1,
-                     icu_ifu_data_valid_ic2, exu_ifu_except, exu_ifu_branch, exu_ifu_ertn);
+                     $time, clk_edge_count, resetn, fcl_req, ack,
+                     data_vld, exu_ifu_except, exu_ifu_branch, exu_ifu_ertn);
             $display("                    | pf_init=%b | pf_old=%b | pf_inc=%b | pf_brn=%b | pf_isr=%b | pf_ert=%b | pf_en=%b",
                      pf_addr_sel_init, pf_addr_sel_old, pf_addr_sel_inc,
                      pf_addr_sel_brn, pf_addr_sel_isr, pf_addr_sel_ert, pf_addr_en);
@@ -336,8 +336,8 @@ module top_tb();
             print_test_start("Normal Request-Ack-DataValid Flow");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -347,7 +347,7 @@ module top_tb();
             wait_cycles(2);
             
             // Check at clock edge
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("ERROR: Request should be high initially");
                 passed = 0;
             end else begin
@@ -356,18 +356,18 @@ module top_tb();
             
             // Send ACK pulse (assert at clock edge, deassert at next clock edge)
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;
+            ack = 1;
             print_realtime_waveform();
             
             @(posedge clk);
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: ACK sent");
             print_realtime_waveform();
             
             // Wait and check if request is cleared
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("OK: Request cleared after ACK");
             end else begin
                 $display("WARNING: Request not cleared - might be retriggered");
@@ -376,18 +376,18 @@ module top_tb();
             // Send data valid pulse
             wait_cycles(2);
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 1;
+            data_vld = 1;
             print_realtime_waveform();
             
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             $display("OK: Data valid signal sent");
             print_realtime_waveform();
             
             // Check if state machine returns to initial state
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1) begin
                 $display("OK: Request high again - ready for next cycle");
                 passed = passed & 1;
             end else begin
@@ -406,8 +406,8 @@ module top_tb();
             print_test_start("ACK in Same Cycle as Request");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -417,7 +417,7 @@ module top_tb();
             wait_cycles(2);
             
             // Check request is high
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("ERROR: Request should be high before ACK test");
                 passed = 0;
             end else begin
@@ -427,11 +427,11 @@ module top_tb();
             // At the next clock edge, assert ACK while request is still high
             // This simulates ICU responding immediately in the same cycle
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;  // ACK asserted in same cycle as request
+            ack = 1;  // ACK asserted in same cycle as request
             
             // Check behavior at this clock edge
             // Both req and ack should be high at the same time
-            if (ifu_icu_req_ic1 === 1'b1 && icu_ifu_ack_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1 && ack === 1'b1) begin
                 $display("OK: Request and ACK both high at same clock edge");
             end else begin
                 $display("ERROR: Both req and ack should be high");
@@ -441,14 +441,14 @@ module top_tb();
             
             // Deassert ACK at next clock edge
             @(posedge clk);
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: ACK deasserted");
             print_realtime_waveform();
             
             // Check if request is cleared after ACK
             wait_cycles(1);
             
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("OK: Request cleared after same-cycle ACK");
             end else begin
                 $display("WARNING: Request not cleared after ACK");
@@ -457,14 +457,14 @@ module top_tb();
             // Continue normal flow with data valid
             wait_cycles(2);
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 1;
+            data_vld = 1;
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             
             // Verify state machine recovers and makes new request
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1) begin
                 $display("OK: New request generated after same-cycle ACK flow");
                 passed = passed & 1;
             end else begin
@@ -483,8 +483,8 @@ module top_tb();
             print_test_start("Exception Interrupt Flow");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -525,8 +525,8 @@ module top_tb();
             print_test_start("Back-to-Back Request Test");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -539,29 +539,29 @@ module top_tb();
                 wait_cycles(2);
                 
                 // Check request at clock edge
-                if (ifu_icu_req_ic1 !== 1'b1) begin
+                if (fcl_req !== 1'b1) begin
                     $display("ERROR: Request not high when expected");
                     passed = 0;
                 end
                 
                 // ACK pulse at clock edges
                 @(posedge clk);
-                icu_ifu_ack_ic1 = 1;
+                ack = 1;
                 print_realtime_waveform();
                 
                 @(posedge clk);
-                icu_ifu_ack_ic1 = 0;
+                ack = 0;
                 $display("OK: ACK sent");
                 print_realtime_waveform();
                 
                 // Data valid pulse at clock edges
                 wait_cycles(2);
                 @(posedge clk);
-                icu_ifu_data_valid_ic2 = 1;
+                data_vld = 1;
                 print_realtime_waveform();
                 
                 @(posedge clk);
-                icu_ifu_data_valid_ic2 = 0;
+                data_vld = 0;
                 $display("OK: Data valid signal sent");
                 print_realtime_waveform();
                 
@@ -581,8 +581,8 @@ module top_tb();
             print_test_start("No ACK Response Scenario");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -592,7 +592,7 @@ module top_tb();
             // Check initial request
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("ERROR: Initial request not present");
                 passed = 0;
             end else begin
@@ -603,7 +603,7 @@ module top_tb();
             repeat(5) wait_cycles(2);
             
             // Request should stay high (waiting for ACK)
-            if (ifu_icu_req_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1) begin
                 $display("OK: Request remains high while waiting for ACK");
             end else begin
                 $display("ERROR: Request should stay high while waiting");
@@ -612,20 +612,20 @@ module top_tb();
             
             // Finally send ACK pulse at clock edges
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;
+            ack = 1;
             print_realtime_waveform();
             
             @(posedge clk);
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: ACK sent after delay");
             print_realtime_waveform();
             
             // Complete the transaction
             wait_cycles(2);
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 1;
+            data_vld = 1;
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             
             print_test_result("No ACK Scenario Test", passed);
         end
@@ -638,8 +638,8 @@ module top_tb();
             print_test_start("Consecutive Requests with Second ACK in Same Cycle");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -650,7 +650,7 @@ module top_tb();
             // Wait for initial request
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("ERROR: First request should be high");
                 passed = 0;
             end else begin
@@ -659,20 +659,20 @@ module top_tb();
             
             // First ACK: normal timing (ack in next cycle after req)
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;
+            ack = 1;
             print_realtime_waveform();
             
             @(posedge clk);
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: First ACK sent (normal timing)");
             print_realtime_waveform();
             
             // Wait for data valid for first request
             wait_cycles(2);
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 1;
+            data_vld = 1;
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             $display("OK: First data valid signal sent");
             print_realtime_waveform();
             
@@ -681,11 +681,11 @@ module top_tb();
             // Second ACK: same-cycle response
             // ICU responds immediately when it sees the request
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;  // ACK in same cycle as request
+            ack = 1;  // ACK in same cycle as request
             
             @(posedge clk);
             // Verify both req and ack are high at same time
-            if (ifu_icu_req_ic1 === 1'b1 && icu_ifu_ack_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1 && ack === 1'b1) begin
                 $display("OK: Second request and ACK both high at same clock edge");
                 $display("    This simulates ICU fast response to second request");
             end else begin
@@ -693,14 +693,14 @@ module top_tb();
                 passed = 0;
             end
 
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: Second ACK deasserted");
 
             print_realtime_waveform();
             
             // Verify request is cleared
             wait_cycles(1);
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("OK: Second request cleared after same-cycle ACK");
             end else begin
                 $display("WARNING: Second request not cleared after ACK");
@@ -709,9 +709,9 @@ module top_tb();
             // Send data valid for second request
             wait_cycles(2);
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 1;
+            data_vld = 1;
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             $display("OK: Second data valid signal sent");
             print_realtime_waveform();
             
@@ -720,7 +720,7 @@ module top_tb();
             // Wait for third request generation
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1) begin
                 $display("OK: Third request generated after mixed-timing sequence");
                 $display("    State machine handles both normal and fast responses correctly");
             end else begin
@@ -745,8 +745,8 @@ module top_tb();
             print_test_start("Consecutive Requests with Second ACK in Next Cycle");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -757,7 +757,7 @@ module top_tb();
             // Wait for initial request
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("ERROR: First request should be high");
                 passed = 0;
             end else begin
@@ -766,20 +766,20 @@ module top_tb();
             
             // First ACK: normal timing (ack in next cycle after req)
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;
+            ack = 1;
             print_realtime_waveform();
             
             @(posedge clk);
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: First ACK sent (normal timing)");
             print_realtime_waveform();
             
             // Wait for data valid for first request
             wait_cycles(2);
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 1;
+            data_vld = 1;
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             $display("OK: First data valid signal sent");
             print_realtime_waveform();
             
@@ -792,9 +792,9 @@ module top_tb();
             // ICU responds in next-cycle when it sees the request
             @(posedge clk);
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;  // ACK in same cycle as request
+            ack = 1;  // ACK in same cycle as request
             
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("ERROR: Second request should be high");
                 passed = 0;
             end else begin
@@ -805,13 +805,13 @@ module top_tb();
             
             // Deassert ACK
             @(posedge clk);
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: Second ACK deasserted");
             print_realtime_waveform();
             
             // Verify request is cleared
             wait_cycles(1);
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("OK: Second request cleared after next-cycle ACK");
             end else begin
                 $display("WARNING: Second request not cleared after ACK");
@@ -820,9 +820,9 @@ module top_tb();
             // Send data valid for second request
             wait_cycles(2);
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 1;
+            data_vld = 1;
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             $display("OK: Second data valid signal sent");
             print_realtime_waveform();
             
@@ -831,7 +831,7 @@ module top_tb();
             // Wait for third request generation
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1) begin
                 $display("OK: Third request generated after mixed-timing sequence");
                 $display("    State machine handles both normal and fast responses correctly");
             end else begin
@@ -856,8 +856,8 @@ module top_tb();
             print_test_start("Consecutive Requests with Second ACK in Same Cycle, Dvalid in Same Cycle");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -868,7 +868,7 @@ module top_tb();
             // Wait for initial request
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("ERROR: First request should be high");
                 passed = 0;
             end else begin
@@ -877,20 +877,20 @@ module top_tb();
             
             // First ACK: normal timing (ack in next cycle after req)
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;
+            ack = 1;
             print_realtime_waveform();
             
             @(posedge clk);
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: First ACK sent (normal timing)");
             print_realtime_waveform();
             
             // Wait for data valid for first request
             wait_cycles(2);
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 1;
+            data_vld = 1;
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             $display("OK: First data valid signal sent");
             print_realtime_waveform();
             
@@ -899,13 +899,13 @@ module top_tb();
             // Second ACK: same-cycle response
             // ICU responds immediately when it sees the request
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;  // ACK in same cycle as request
+            ack = 1;  // ACK in same cycle as request
             
-            icu_ifu_data_valid_ic2 = 1; // data_valid in same cycle as request
+            data_vld = 1; // data_valid in same cycle as request
             
             @(posedge clk);
             // Verify both req and ack are high at same time
-            if (ifu_icu_req_ic1 === 1'b1 && icu_ifu_ack_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1 && ack === 1'b1) begin
                 $display("OK: Second request and ACK both high at same clock edge");
                 $display("    This simulates ICU fast response to second request");
             end else begin
@@ -914,17 +914,17 @@ module top_tb();
             end
 
             // Deassert ACK and data valid
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: Second ACK deasserted");
 
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             $display("OK: Second data valid signal sent");
 
             print_realtime_waveform();
             
             // Verify request is cleared
             //wait_cycles(1);
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("OK: Second request cleared after same-cycle ACK");
             end else begin
                 $display("WARNING: Second request not cleared after ACK");
@@ -935,7 +935,7 @@ module top_tb();
             // Wait for third request generation
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1) begin
                 $display("OK: Third request generated after mixed-timing sequence");
                 $display("    State machine handles both normal and fast responses correctly");
             end else begin
@@ -960,8 +960,8 @@ module top_tb();
             print_test_start("Consecutive Requests with Second ACK in Same Cycle, Dvalid in Next Cycle");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -972,7 +972,7 @@ module top_tb();
             // Wait for initial request
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("ERROR: First request should be high");
                 passed = 0;
             end else begin
@@ -981,20 +981,20 @@ module top_tb();
             
             // First ACK: normal timing (ack in next cycle after req)
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;
+            ack = 1;
             print_realtime_waveform();
             
             @(posedge clk);
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: First ACK sent (normal timing)");
             print_realtime_waveform();
             
             // Wait for data valid for first request
             wait_cycles(2);
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 1;
+            data_vld = 1;
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             $display("OK: First data valid signal sent");
             print_realtime_waveform();
             
@@ -1003,11 +1003,11 @@ module top_tb();
             // Second ACK: same-cycle response
             // ICU responds immediately when it sees the request
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;  // ACK in same cycle as request
+            ack = 1;  // ACK in same cycle as request
             
             @(posedge clk);
             // Verify both req and ack are high at same time
-            if (ifu_icu_req_ic1 === 1'b1 && icu_ifu_ack_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1 && ack === 1'b1) begin
                 $display("OK: Second request and ACK both high at same clock edge");
                 $display("    This simulates ICU fast response to second request");
             end else begin
@@ -1015,14 +1015,14 @@ module top_tb();
                 passed = 0;
             end
 
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: Second ACK deasserted");
 
             print_realtime_waveform();
             
             // Verify request is cleared
             //wait_cycles(1);
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("OK: Second request cleared after same-cycle ACK");
             end else begin
                 $display("WARNING: Second request not cleared after ACK");
@@ -1031,9 +1031,9 @@ module top_tb();
             // Send data valid for second request in next cycle
             //wait_cycles(2);
             //@(posedge clk);
-            icu_ifu_data_valid_ic2 = 1;
+            data_vld = 1;
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             $display("OK: Second data valid signal sent");
             print_realtime_waveform();
             
@@ -1042,7 +1042,7 @@ module top_tb();
             // Wait for third request generation
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1) begin
                 $display("OK: Third request generated after mixed-timing sequence");
                 $display("    State machine handles both normal and fast responses correctly");
             end else begin
@@ -1067,8 +1067,8 @@ module top_tb();
             print_test_start("Consecutive Requests with Second ACK in Next Cycle, Dvalid in Next Cycle");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -1079,7 +1079,7 @@ module top_tb();
             // Wait for initial request
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("ERROR: First request should be high");
                 passed = 0;
             end else begin
@@ -1088,20 +1088,20 @@ module top_tb();
             
             // First ACK: normal timing (ack in next cycle after req)
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;
+            ack = 1;
             print_realtime_waveform();
             
             @(posedge clk);
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: First ACK sent (normal timing)");
             print_realtime_waveform();
             
             // Wait for data valid for first request
             wait_cycles(2);
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 1;
+            data_vld = 1;
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             $display("OK: First data valid signal sent");
             print_realtime_waveform();
             
@@ -1111,11 +1111,11 @@ module top_tb();
             // ICU responds in next-cycle when it sees the request
             @(posedge clk);
             @(posedge clk);
-            icu_ifu_ack_ic1 = 1;  // ACK in next cycle as request
+            ack = 1;  // ACK in next cycle as request
             
             @(posedge clk);
             // Verify both req and ack are high at same time
-            if (ifu_icu_req_ic1 === 1'b1 && icu_ifu_ack_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1 && ack === 1'b1) begin
                 $display("OK: Second request and ACK both high at same clock edge");
                 $display("    This simulates ICU response to second request");
             end else begin
@@ -1123,14 +1123,14 @@ module top_tb();
                 passed = 0;
             end
 
-            icu_ifu_ack_ic1 = 0;
+            ack = 0;
             $display("OK: Second ACK deasserted");
 
             print_realtime_waveform();
             
             // Verify request is cleared
             //wait_cycles(1);
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("OK: Second request cleared after next-cycle ACK");
             end else begin
                 $display("WARNING: Second request not cleared after ACK");
@@ -1139,9 +1139,9 @@ module top_tb();
             // Send data valid for second request in next cycle
             //wait_cycles(2);
             //@(posedge clk);
-            icu_ifu_data_valid_ic2 = 1;
+            data_vld = 1;
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 0;
+            data_vld = 0;
             $display("OK: Second data valid signal sent");
             print_realtime_waveform();
             
@@ -1150,7 +1150,7 @@ module top_tb();
             // Wait for third request generation
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1) begin
                 $display("OK: Third request generated after normal timing sequence");
                 $display("    State machine handles normal response timings correctly");
             end else begin
@@ -1175,8 +1175,8 @@ module top_tb();
             print_test_start("Branch Interrupt Test");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -1186,7 +1186,7 @@ module top_tb();
             // Wait for initial request
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("ERROR: Request should be high");
                 passed = 0;
             end
@@ -1211,7 +1211,7 @@ module top_tb();
             wait_cycles(1);
             
             // Check if new request is generated after branch
-            if (ifu_icu_req_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1) begin
                 $display("OK: New request generated after branch");
             end else begin
                 $display("ERROR: Should generate new request after branch");
@@ -1229,8 +1229,8 @@ module top_tb();
             print_test_start("Exception Interrupt Test");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -1239,7 +1239,7 @@ module top_tb();
             $display("\n--- Phase 1: Start normal request ---");
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("ERROR: Request should be high");
                 passed = 0;
             end
@@ -1263,7 +1263,7 @@ module top_tb();
             $display("\n--- Phase 3: Check state after flush ---");
             wait_cycles(1);
             
-            if (ifu_icu_req_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1) begin
                 $display("OK: New request generated after exception");
             end else begin
                 $display("ERROR: Should generate new request after exception");
@@ -1281,8 +1281,8 @@ module top_tb();
             print_test_start("ERTN Interrupt Test");
             
             // Initialize conditions
-            icu_ifu_ack_ic1 = 0;
-            icu_ifu_data_valid_ic2 = 0;
+            ack = 0;
+            data_vld = 0;
             exu_ifu_except = 0;
             exu_ifu_branch = 0;
             exu_ifu_ertn = 0;
@@ -1291,7 +1291,7 @@ module top_tb();
             $display("\n--- Phase 1: Start normal request ---");
             wait_cycles(2);
             
-            if (ifu_icu_req_ic1 !== 1'b1) begin
+            if (fcl_req !== 1'b1) begin
                 $display("ERROR: Request should be high");
                 passed = 0;
             end
@@ -1315,7 +1315,7 @@ module top_tb();
             $display("\n--- Phase 3: Check state after flush ---");
             wait_cycles(1);
             
-            if (ifu_icu_req_ic1 === 1'b1) begin
+            if (fcl_req === 1'b1) begin
                 $display("OK: New request generated after ERTN");
             end else begin
                 $display("ERROR: Should generate new request after ERTN");
@@ -1334,8 +1334,8 @@ module top_tb();
             @(posedge clk);
             $display("Time=%t | clk_edge=%0d", $time, clk_edge_count);
             $display("  Control: resetn=%b, req=%b, ack=%b, valid=%b, except=%b, branch=%b, ertn=%b",
-                     resetn, ifu_icu_req_ic1, icu_ifu_ack_ic1,
-                     icu_ifu_data_valid_ic2, exu_ifu_except, exu_ifu_branch, exu_ifu_ertn);
+                     resetn, fcl_req, ack,
+                     data_vld, exu_ifu_except, exu_ifu_branch, exu_ifu_ertn);
             $display("  AddrSel: pf_init=%b, pf_old=%b, pf_inc=%b, pf_brn=%b, pf_isr=%b, pf_ert=%b, pf_en=%b",
                      pf_addr_sel_init, pf_addr_sel_old, pf_addr_sel_inc,
                      pf_addr_sel_brn, pf_addr_sel_isr, pf_addr_sel_ert, pf_addr_en);

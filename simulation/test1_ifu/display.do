@@ -7,7 +7,6 @@ add wave -position end  result:/top_tb/dut/ifu_icu_addr_ic1
 add wave -position end  result:/top_tb/dut/ifu_icu_req_ic1
 add wave -position end  result:/top_tb/dut/icu_ifu_ack_ic1
 add wave -position end  result:/top_tb/dut/icu_ifu_data_valid_ic2
-add wave -position end  result:/top_tb/dut/u_fcl/icu_data_vld
 add wave -divider
 add wave -position end  result:/top_tb/dut/u_fcl/data_cancel_en
 add wave -position end  result:/top_tb/dut/u_fcl/data_cancel_in
