@@ -41,7 +41,9 @@ wire [31:0]      ifu_exu_pc_d;
 c7bifu dut (
     .clk                  (clk),
     .resetn               (resetn),
-    
+
+    .ic_en(1'b1),
+
     // ICU interface
     .ifu_icu_addr_ic1     (ifu_icu_addr_ic1),
     .ifu_icu_req_ic1      (ifu_icu_req_ic1),
