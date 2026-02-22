@@ -8,6 +8,7 @@ module c7bifu_fcl (
    input              exu_ifu_branch,
    input              exu_ifu_ertn,
    input              exu_ifu_stall,
+   input              csr_ifu_ic_en_pls,
 
    output             pf_addr_sel_init,
    output             pf_addr_sel_old,
@@ -22,7 +23,9 @@ module c7bifu_fcl (
    output             stall,
    output             flush,
    output             flush_dly1,
-   input              iq_full
+   input              iq_full,
+
+   output             wait_bus_clr
 );
 
    // Pipeline, pf (pre-fetch) and f (fetch)
@@ -51,6 +54,7 @@ module c7bifu_fcl (
    wire data_cancel_en;
 
 
+
    // Synchronizes resetn to clock domain, active for one cycle after resetn
    // deassertion This ensures clean reset state transitions and prevents
    // metastability
@@ -60,6 +64,18 @@ module c7bifu_fcl (
    // resetn_sync_q       ____________/
    //                         | 1cycle|
    wire resetn_sync_q;
+
+
+   wire wait_bus_clr_bgn;
+   wire wait_bus_clr_end;
+   wire wait_bus_clr_in;
+   wire wait_bus_clr_q;
+
+   assign wait_bus_clr_bgn = csr_ifu_ic_en_pls;
+   assign wait_bus_clr_end = ~data_stall;
+
+   assign wait_bus_clr_in = (~wait_bus_clr_end) & (wait_bus_clr_bgn | wait_bus_clr_q); 
+   assign wait_bus_clr = wait_bus_clr_in;
 
 
    assign flush = except | branch | ertn;
@@ -100,6 +116,7 @@ module c7bifu_fcl (
    //assign req = (( ~req_q & ~d_stall_q) | flush)
    assign req = (( ~req_q & ~d_stall_in) | flush) // uty: test
 		    & ~iq_full
+		    & ~wait_bus_clr_in
 		    ; //& resetn_sync_q;
 
    assign req_in = (~ack) & (req | req_q);
@@ -114,7 +131,7 @@ module c7bifu_fcl (
    // if wait through the registers, then it will be late.
    // Therefore, cancel fcl_req now.
    //assign fcl_req = req_q;
-   assign fcl_req = req_q & ~iq_full;
+   assign fcl_req = req_q & ~iq_full & ~wait_bus_clr_in;
 
 
    // ack                                 : _-_____
@@ -199,6 +216,12 @@ module c7bifu_fcl (
       .clk (clk),
       .rst_l (resetn),
       .q   (resetn_sync_q));
+
+   dffrl_ns #(1) wait_bus_clr_reg (
+      .din (wait_bus_clr_in),
+      .clk (clk),
+      .rst_l (resetn),
+      .q   (wait_bus_clr_q));
 
    dffrle_ns #(1) data_cancel_reg (
       .din (data_cancel_in),

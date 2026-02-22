@@ -2,7 +2,8 @@ module c7bifu (
    input              clk,
    input              resetn,
 
-   input              ic_en,
+   input              csr_ifu_ic_en,
+   input              csr_ifu_ic_en_pls,
 
    // icu interface
    output [31:0]      ifu_icu_addr_ic1,
@@ -106,6 +107,10 @@ module c7bifu (
    wire flush;
    wire flush_dly1;
    wire iq_full;
+   wire wait_bus_clr;
+
+   wire ic_en;
+   wire ic_en_en = ~wait_bus_clr;
 
    wire dec_exc_vld_d;
    wire [5:0] dec_exc_code_d;
@@ -126,7 +131,8 @@ module c7bifu (
    assign ifu_icu_req_ic1 = fcl_req & ic_en;
    assign ifu_biu_rd_req = fcl_req & ~ic_en;
 
-   assign ack = ic_en ? icu_ifu_ack_ic1 : biu_ifu_rd_ack;
+   //assign ack = ic_en ? icu_ifu_ack_ic1 : biu_ifu_rd_ack;
+   assign ack = icu_ifu_ack_ic1 | biu_ifu_rd_ack;
    assign data = ic_en ? icu_ifu_data_ic2 : biu_ifu_data;
    assign data_vld = ic_en ? icu_ifu_data_valid_ic2 : biu_ifu_data_valid;
 
@@ -140,6 +146,7 @@ module c7bifu (
       .exu_ifu_branch                  (exu_ifu_branch),
       .exu_ifu_ertn                    (exu_ifu_ertn),
       .exu_ifu_stall                   (exu_ifu_stall),
+      .csr_ifu_ic_en_pls               (csr_ifu_ic_en_pls),
       .pf_addr_sel_init                (pf_addr_sel_init),
       .pf_addr_sel_old                 (pf_addr_sel_old),
       .pf_addr_sel_inc                 (pf_addr_sel_inc),
@@ -151,7 +158,8 @@ module c7bifu (
       .stall                           (stall),
       .flush                           (flush),
       .flush_dly1                      (flush_dly1),
-      .iq_full                         (iq_full)
+      .iq_full                         (iq_full),
+      .wait_bus_clr                    (wait_bus_clr)
    );
 
    assign pf_addr_inc = pf_addr_q + 4'h8;
@@ -266,5 +274,12 @@ module c7bifu (
       .en  (pf_addr_en),
       .clk (clk),
       .q   (pf_addr_q));
+
+   dffrle_ns #(1) ic_en_reg (
+      .din (csr_ifu_ic_en),
+      .en  (ic_en_en),
+      .clk (clk),
+      .rst_l (resetn),
+      .q   (ic_en));
 
 endmodule
