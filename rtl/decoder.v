@@ -804,7 +804,8 @@ wire valid = op_rdtimel_w || op_rdtimeh_w || op_add_w     || op_sub_w   || op_sl
              op_lu12i_w || op_pcaddu12i || op_ll_w  || op_sc_w  || op_ld_b  || op_ld_h  || op_ld_w  || op_st_b  || op_st_h  ||
              op_st_w    || op_ld_bu     || op_ld_wu || op_ld_hu || op_preld || op_fld_s || op_fst_s || op_fld_d || op_fst_d ||
              op_dbar    || op_ibar      || op_bceqz || op_bcnez || op_jirl  || op_b     || op_bl    || op_beq   || op_bne   ||
-             op_blt     || op_bge       || op_bltu  || op_bgeu  || op_bnez  || op_beqz ;
+             op_blt     || op_bge       || op_bltu  || op_bgeu  || op_bnez  || op_beqz  ||
+	     op_alsl_w  || op_alsl_wu; // uty: test  loongarch32r does not include alsl.w alsl.wu
 `endif
 
 ////result
