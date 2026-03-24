@@ -63,6 +63,7 @@ module top_tb();
         .exu_ifu_except(exu_ifu_except),
         .exu_ifu_branch(exu_ifu_branch),
         .exu_ifu_ertn(exu_ifu_ertn),
+	.csr_ifu_ic_en_pls(1'b0),
         .pf_addr_sel_init(pf_addr_sel_init),
         .pf_addr_sel_old(pf_addr_sel_old),
         .pf_addr_sel_inc(pf_addr_sel_inc),
@@ -152,9 +153,6 @@ module top_tb();
         repeat(2) @(posedge clk);
 
         // Run test cases
-//        test_normal_flow();
-//        test_same_cycle_ack();
-        
 
         // # clk    : ^^^^^^^^^^
         // # resetn : ----------
@@ -194,14 +192,6 @@ module top_tb();
         // # valid  : ___-___-__
         test_consecutive_requests_second_next_cycle_dvalid_next_cycle();
 
-//        test_exception_flow();
-//        test_back_to_back_request();
-//        test_no_ack_scenario();
-        
-        // New interrupt tests
-//        test_branch_interrupt();
-//        test_exception_interrupt();
-//        test_ertn_interrupt();
 
         // Print final test results
         print_final_results();

@@ -8,7 +8,7 @@ add wave -radix hex -position end  result:/top_tb/dut/ifu_icu_req_ic1
 add wave -radix hex -position end  result:/top_tb/icu_ifu_ack_ic1
 add wave -radix hex -position end  result:/top_tb/dut/icu_ifu_data_ic2
 add wave -radix hex -position end  result:/top_tb/dut/icu_ifu_data_valid_ic2
-add wave -radix hex -position end  result:/top_tb/dut/icu_data_vld
+add wave -radix hex -position end  result:/top_tb/dut/fcl_data_vld
 
 add wave -divider
 add wave -radix hex -position end  result:/top_tb/dut/inst_addr_f

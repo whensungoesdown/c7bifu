@@ -75,8 +75,9 @@ module top_tb();
     c7bifu dut (
         .clk(clk),
         .resetn(resetn),
-
-	.ic_en(1'b1),
+        
+	.csr_ifu_ic_en(1'b1),
+        .csr_ifu_ic_en_pls(1'b0),
 
         .ifu_icu_addr_ic1(ifu_icu_addr_ic1),
         .ifu_icu_req_ic1(ifu_icu_req_ic1),
@@ -212,6 +213,7 @@ module top_tb();
         resetn = 0;
         icu_ifu_ack_ic1 = 0;
         icu_ifu_data_valid_ic2 = 0;
+	biu_ifu_rd_ack = 0;
         exu_ifu_except = 0;
         exu_ifu_branch = 0;
         exu_ifu_ertn = 0;

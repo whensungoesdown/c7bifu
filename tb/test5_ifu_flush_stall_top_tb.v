@@ -46,12 +46,18 @@ c7bifu uut (
     .clk(clk),
     .resetn(resetn),
     
+    .csr_ifu_ic_en(1'b1),
+    .csr_ifu_ic_en_pls(1'b0),
+
     // ICU interface
     .ifu_icu_addr_ic1(ifu_icu_addr_ic1),
     .ifu_icu_req_ic1(ifu_icu_req_ic1),
     .icu_ifu_ack_ic1(icu_ifu_ack_ic1),
     .icu_ifu_data_valid_ic2(icu_ifu_data_valid_ic2),
     .icu_ifu_data_ic2(icu_ifu_data_ic2),
+
+    .biu_ifu_rd_ack(1'b0),
+    .biu_ifu_data_valid(1'b0),
     
     // EXU interface inputs
     .exu_ifu_except(exu_ifu_except),
