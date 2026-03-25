@@ -250,9 +250,9 @@ module c7bifu (
       .ifu_exu_mul_short_d             (ifu_exu_mul_short_d),
 
       // div
-      ifu_exu_div_vld_d                (ifu_exu_div_vld_d),
-      ifu_exu_div_signed_d             (ifu_exu_div_signed_d),
-      ifu_exu_div_mod_d                (ifu_exu_div_mod_d),
+      .ifu_exu_div_vld_d               (ifu_exu_div_vld_d),
+      .ifu_exu_div_signed_d            (ifu_exu_div_signed_d),
+      .ifu_exu_div_mod_d               (ifu_exu_div_mod_d),
 
       // csr
       .ifu_exu_csr_vld_d               (ifu_exu_csr_vld_d),
