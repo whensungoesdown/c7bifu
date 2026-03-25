@@ -60,6 +60,11 @@ module c7bifu (
    output             ifu_exu_mul_hi_d,
    output             ifu_exu_mul_short_d,
 
+   // div
+   output             ifu_exu_div_vld_d,
+   output             ifu_exu_div_signed_d,
+   output             ifu_exu_div_mod_d,
+
    // csr
    output             ifu_exu_csr_vld_d,
    output [13:0]      ifu_exu_csr_raddr_d, // CSR_BIT 14
@@ -243,6 +248,11 @@ module c7bifu (
       .ifu_exu_mul_double_d            (ifu_exu_mul_double_d),
       .ifu_exu_mul_hi_d                (ifu_exu_mul_hi_d),
       .ifu_exu_mul_short_d             (ifu_exu_mul_short_d),
+
+      // div
+      ifu_exu_div_vld_d                (ifu_exu_div_vld_d),
+      ifu_exu_div_signed_d             (ifu_exu_div_signed_d),
+      ifu_exu_div_mod_d                (ifu_exu_div_mod_d),
 
       // csr
       .ifu_exu_csr_vld_d               (ifu_exu_csr_vld_d),

@@ -46,6 +46,11 @@ module c7bifu_dec (
    output             ifu_exu_mul_hi_d,
    output             ifu_exu_mul_short_d,
 
+   // div
+   output             ifu_exu_div_vld_d,
+   output             ifu_exu_div_signed_d,
+   output             ifu_exu_div_mod_d,
+
    // csr
    output             ifu_exu_csr_vld_d,
    output [13:0]      ifu_exu_csr_raddr_d,
@@ -107,7 +112,7 @@ module c7bifu_dec (
    wire lsu_dispatch_d = op_d[`LLSU_RELATED];
    wire bru_dispatch_d = op_d[`LBRU_RELATED];
    wire mul_dispatch_d = op_d[`LMUL_RELATED];
-   //wire div_dispatch_d = op_d[`LDIV_RELATED];
+   wire div_dispatch_d = op_d[`LDIV_RELATED];
    wire none_dispatch_d = (op_d[`LCSR_RELATED] || op_d[`LTLB_RELATED] || op_d[`LCACHE_RELATED]);
    wire ertn_dispatch_d = op_d[`LERET];
 
@@ -173,6 +178,16 @@ module c7bifu_dec (
    assign ifu_exu_mul_short_d  = mul_op_d == `LMDU_MUL_W    ||
                                  mul_op_d == `LMDU_MULH_W   ||
                                  mul_op_d == `LMDU_MULH_WU  ;
+
+   // div
+   assign ifu_exu_div_vld_d = div_dispatch_d & ifu_exu_vld_d;
+   wire [`LMDU_CODE_BIT-1:0] div_op_d = op_d[`LMDU_CODE];
+
+   assign ifu_exu_div_mod_d = div_op_d == `LMDU_MOD_W ||
+                              div_op_d == `LMDU_MOD_WU;
+
+   assign ifu_exu_div_signed_d = div_op_d == `LMDU_DIV_W ||
+                                 div_op_d == `LMDU_MOD_W;
 
    // csr
    assign ifu_exu_csr_vld_d = none_dispatch_d & ifu_exu_vld_d;
