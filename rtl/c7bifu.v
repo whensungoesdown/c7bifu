@@ -125,12 +125,12 @@ module c7bifu (
    // stage must predict whether the currently decoded instructions will cause
    // a stall once they reach the execution (_e) stage.
    // To prevent instructions from being lost (dropped), stall_dec is
-   // preemptively asserted one cycle earlier upon decoding CSR or LSU
+   // preemptively asserted one cycle earlier upon decoding CSR, LSU and DIV
    // instructions.
    // Additional instruction types may be added to this preemptive stall logic
    // in the future.
    assign stall_dec = stall;
-   assign stall_iq = stall | ifu_exu_csr_vld_d | ifu_exu_lsu_vld_d; 
+   assign stall_iq = stall | ifu_exu_csr_vld_d | ifu_exu_lsu_vld_d | ifu_exu_div_vld_d; 
 
    wire fcl_req;
    assign ifu_icu_req_ic1 = fcl_req & ic_en;
