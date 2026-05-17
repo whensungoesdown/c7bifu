@@ -1,4 +1,4 @@
-`define LDECODE_RES_BIT  60
+`define LDECODE_RES_BIT  61
 `define LGR_WEN          0
 `define LRJ_READ         1
 `define LRK_READ         2
@@ -46,8 +46,9 @@
 `define LIBAR            55
 `define LRD2RJ           56
 `define LINE             57
-`define LRDTIME          58
-`define LWAIT            59
+`define LRDTIMEL         58
+`define LRDTIMEH         59
+`define LWAIT            60
 
 `define LOP_CODE_BIT     7
 `define LALU_CODE        33:28

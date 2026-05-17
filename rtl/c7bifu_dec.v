@@ -57,6 +57,9 @@ module c7bifu_dec (
    output             ifu_exu_csr_xchg_d,
    output             ifu_exu_csr_wen_d,
    output [13:0]      ifu_exu_csr_waddr_d,
+   output             ifu_exu_csr_rdtimel_d,
+   output             ifu_exu_csr_rdtimeh_d,
+
 
    // ertn
    output             ifu_exu_ertn_vld_d,
@@ -113,7 +116,7 @@ module c7bifu_dec (
    wire bru_dispatch_d = op_d[`LBRU_RELATED];
    wire mul_dispatch_d = op_d[`LMUL_RELATED];
    wire div_dispatch_d = op_d[`LDIV_RELATED];
-   wire none_dispatch_d = (op_d[`LCSR_RELATED] || op_d[`LTLB_RELATED] || op_d[`LCACHE_RELATED]);
+   wire none_dispatch_d = (op_d[`LCSR_RELATED] || op_d[`LTLB_RELATED] || op_d[`LCACHE_RELATED]); // rdtimel rdtimh are csr_related
    wire ertn_dispatch_d = op_d[`LERET];
 
 
@@ -195,6 +198,8 @@ module c7bifu_dec (
    assign ifu_exu_csr_xchg_d = op_d[`LCSR_XCHG];
    assign ifu_exu_csr_wen_d = (op_d[`LCSR_XCHG] | op_d[`LCSR_WRITE]) & ifu_exu_csr_vld_d;
    assign ifu_exu_csr_waddr_d = `GET_CSR(inst_d);
+   assign ifu_exu_csr_rdtimel_d = op_d[`LRDTIMEL];
+   assign ifu_exu_csr_rdtimeh_d = op_d[`LRDTIMEH];
 
    // ertn
    assign ifu_exu_ertn_vld_d = ertn_dispatch_d & ifu_exu_vld_d;

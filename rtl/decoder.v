@@ -694,7 +694,9 @@ wire syscall = op_syscall;
 
 wire eret = op_eret;
 
-wire rdtime = op_rdtimel_w || op_rdtimeh_w || op_rdtime_d;
+//wire rdtime = op_rdtimel_w || op_rdtimeh_w || op_rdtime_d;
+wire rdtimel = op_rdtimel_w;
+wire rdtimeh = op_rdtimeh_w;
 
 wire [2:0] imm_shift =  (op_pcaddi || op_ll_d || op_ll_w || op_sc_d || op_sc_w || op_ldptr_d || 
                          op_ldptr_w || op_stptr_d || op_stptr_w || bru_related) ? `LIMM_SHIFT_2 :
@@ -864,7 +866,8 @@ assign res[`LFF_EXCHANGE   ] = {1'b0,ff_exchange};
 assign res[`LFPU_STAGE     ] = 3'b0; // Unimplemented
 
 assign res[`LINE           ] = !valid || (op_invtlb && ((op_rd != 5'h0) && (op_rd != 5'h1) && (op_rd != 5'h2) && (op_rd != 5'h3) && (op_rd != 5'h4) && (op_rd != 5'h5) && (op_rd != 5'h6)));
-assign res[`LRDTIME        ] = rdtime;
+assign res[`LRDTIMEL       ] = rdtimel;
+assign res[`LRDTIMEH       ] = rdtimeh;
 assign res[`LWAIT          ] = op_wait;
 
 endmodule

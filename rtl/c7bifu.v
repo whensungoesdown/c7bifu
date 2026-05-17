@@ -71,6 +71,8 @@ module c7bifu (
    output             ifu_exu_csr_xchg_d,
    output             ifu_exu_csr_wen_d,
    output [13:0]      ifu_exu_csr_waddr_d, // CSR_BIT 14
+   output             ifu_exu_csr_rdtimel_d,
+   output             ifu_exu_csr_rdtimeh_d,
 
    // ertn
    output             ifu_exu_ertn_vld_d,
@@ -260,6 +262,8 @@ module c7bifu (
       .ifu_exu_csr_xchg_d              (ifu_exu_csr_xchg_d),
       .ifu_exu_csr_wen_d               (ifu_exu_csr_wen_d),
       .ifu_exu_csr_waddr_d             (ifu_exu_csr_waddr_d),
+      .ifu_exu_csr_rdtimel_d           (ifu_exu_csr_rdtimel_d),
+      .ifu_exu_csr_rdtimeh_d           (ifu_exu_csr_rdtimeh_d),
 
       // ertn
       .ifu_exu_ertn_vld_d              (ifu_exu_ertn_vld_d),
