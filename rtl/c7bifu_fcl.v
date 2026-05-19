@@ -9,6 +9,8 @@ module c7bifu_fcl (
    input              exu_ifu_ertn,
    input              exu_ifu_stall,
    input              csr_ifu_ic_en_pls,
+   
+   input              fetch_except_hold,
 
    output             pf_addr_sel_init,
    output             pf_addr_sel_old,
@@ -27,6 +29,8 @@ module c7bifu_fcl (
 
    output             wait_bus_clr
 );
+
+   reg hold_fcl_req;
 
    // Pipeline, pf (pre-fetch) and f (fetch)
    // Create stall in pf when waiting for memory ack (icu_ack)
@@ -108,6 +112,27 @@ module c7bifu_fcl (
    // # valid  : ___-____-_
 
 
+
+   //always @(posedge clk or negedge resetn) begin
+   //   if (!resetn)
+   //      hold_fcl_req <= 1'b0;
+   //   else if (fetch_except_hold)
+   //      hold_fcl_req <= 1'b1;          // 检测到 fetch_except_hold，置起 hold
+   //   else if (exu_ifu_except)
+   //      hold_fcl_req <= 1'b0;          // 处理异常请求，清除 hold
+   //end
+
+   always @(posedge clk or negedge resetn) begin
+      if (!resetn)
+         hold_fcl_req <= 1'b0;
+      else if (exu_ifu_except)
+         hold_fcl_req <= 1'b0;          // 处理异常请求，清除 hold，优先级最高
+      else if (fetch_except_hold)
+         hold_fcl_req <= 1'b1;          // 检测到 fetch_except_hold，置起 hold
+   end
+
+
+
    // Note: resetn_sync_q omitted to prevent premature address increment
    //
    // Fix: Keep stall_pf asserted during entire reset period
@@ -117,6 +142,7 @@ module c7bifu_fcl (
    assign req = (( ~req_q & ~d_stall_in) | flush) // uty: test
 		    & ~iq_full
 		    & ~wait_bus_clr_in
+		    & (~hold_fcl_req | flush) // 当 flush 时忽略 hold_fcl_req
 		    ; //& resetn_sync_q;
 
    assign req_in = (~ack) & (req | req_q);
@@ -131,7 +157,8 @@ module c7bifu_fcl (
    // if wait through the registers, then it will be late.
    // Therefore, cancel fcl_req now.
    //assign fcl_req = req_q;
-   assign fcl_req = req_q & ~iq_full & ~wait_bus_clr_in;
+   //assign fcl_req = req_q & ~iq_full & ~wait_bus_clr_in;
+   assign fcl_req = req_q & ~iq_full & ~wait_bus_clr_in & ~hold_fcl_req;
 
 
    // ack                                 : _-_____

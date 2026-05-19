@@ -11,6 +11,8 @@ module c7bifu (
    input              icu_ifu_ack_ic1,
    input              icu_ifu_data_valid_ic2,
    input  [63:0]      icu_ifu_data_ic2,
+   input              icu_ifu_fault_ic2,
+   input  [1:0]       icu_ifu_fault_code_ic2,
 
    // biu interface
    output [31:0]      ifu_biu_rd_addr,
@@ -18,6 +20,8 @@ module c7bifu (
    input              biu_ifu_rd_ack,
    input              biu_ifu_data_valid,
    input  [63:0]      biu_ifu_data,
+   input              biu_ifu_fault,
+   input  [1:0]       biu_ifu_fault_code,
 
    input              exu_ifu_except,
    input  [31:0]      exu_ifu_isr_addr,
@@ -79,7 +83,8 @@ module c7bifu (
 
    // exc
    output             ifu_exu_exc_vld_d,
-   output [5:0]       ifu_exu_exc_code_d
+   output [5:0]       ifu_exu_exc_code_d,
+   output [31:0]      ifu_exu_exc_badv_d
 );
 
    wire [63:0] data;
@@ -119,9 +124,13 @@ module c7bifu (
    wire ic_en;
    wire ic_en_en = ~wait_bus_clr;
 
+   wire fet_exc_vld;
+
    wire dec_exc_vld_d;
    wire [5:0] dec_exc_code_d;
    
+   wire dec_vld_d;
+
    // The stall_dec signal is asserted when exu_ifu_stall is active.
    // Due to a one-cycle read delay in the instruction queue (IQ), the decode
    // stage must predict whether the currently decoded instructions will cause
@@ -141,7 +150,17 @@ module c7bifu (
    //assign ack = ic_en ? icu_ifu_ack_ic1 : biu_ifu_rd_ack;
    assign ack = icu_ifu_ack_ic1 | biu_ifu_rd_ack;
    assign data = ic_en ? icu_ifu_data_ic2 : biu_ifu_data;
-   assign data_vld = ic_en ? icu_ifu_data_valid_ic2 : biu_ifu_data_valid;
+
+   assign data_vld = ic_en ? (icu_ifu_data_valid_ic2 | icu_ifu_fault_ic2) : (biu_ifu_data_valid | biu_ifu_fault);
+   //assign data_vld = ic_en ? icu_ifu_data_valid_ic2 : biu_ifu_data_valid;
+
+   //
+   // if fetch causing exception, hold the fetch until exu_ifu_except brings
+   // the exu_ifu_isr_addr
+   // --- This does not work, becuase the exception needs to be carried by one
+   // instruction to the exu. If data_vld not valid, the whole fetch mechanism
+   // may stuck
+   //assign data_vld = (ic_en ? icu_ifu_data_valid_ic2 : biu_ifu_data_valid) | exu_ifu_except;
 
    c7bifu_fcl u_fcl (
       .clk                             (clk),
@@ -154,6 +173,9 @@ module c7bifu (
       .exu_ifu_ertn                    (exu_ifu_ertn),
       .exu_ifu_stall                   (exu_ifu_stall),
       .csr_ifu_ic_en_pls               (csr_ifu_ic_en_pls),
+
+      .fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2),
+
       .pf_addr_sel_init                (pf_addr_sel_init),
       .pf_addr_sel_old                 (pf_addr_sel_old),
       .pf_addr_sel_inc                 (pf_addr_sel_inc),
@@ -218,7 +240,8 @@ module c7bifu (
       .inst_addr_f                     (inst_addr_f),
       .inst_f                          (inst_f),
 
-      .ifu_exu_vld_d                   (ifu_exu_vld_d),
+      //.ifu_exu_vld_d                   (ifu_exu_vld_d),
+      .ifu_exu_vld_d                   (dec_vld_d),
       .ifu_exu_pc_d                    (ifu_exu_pc_d),
       .ifu_exu_rs1_d                   (ifu_exu_rs1_d),
       .ifu_exu_rs2_d                   (ifu_exu_rs2_d),
@@ -273,10 +296,22 @@ module c7bifu (
       .dec_exc_code_d                  (dec_exc_code_d)
    );
 
+   assign fet_exc_vld = biu_ifu_fault | icu_ifu_fault_ic2;
+   // biu_ifu_fault_code is not used for now
+
    // When ifu_exu_exc_vld_d is asserted, EXU must cancel execution of any
    // simultaneously valid instruction.
-   assign ifu_exu_exc_vld_d = dec_exc_vld_d; // | other front exceptions
-   assign ifu_exu_exc_code_d = dec_exc_code_d;
+   //assign ifu_exu_exc_vld_d = dec_exc_vld_d; // | other front exceptions
+   //assign ifu_exu_exc_code_d = dec_exc_code_d;
+
+   assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld;
+   assign ifu_exu_exc_code_d = fet_exc_vld ? `EXC_ADEF: dec_exc_code_d;
+
+   assign ifu_exu_exc_badv_d = ic_en ? ifu_icu_addr_ic1 : ifu_biu_rd_addr;
+
+   // this instruction carries the ADEF exception, so, we have to valid it
+   // even though this may not be a valid instruction.
+   assign ifu_exu_vld_d = dec_vld_d | ifu_exu_exc_vld_d;
 
 
    //
