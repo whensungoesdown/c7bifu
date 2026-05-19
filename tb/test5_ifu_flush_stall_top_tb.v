@@ -9,6 +9,12 @@ reg clk;
 reg resetn;
 
 // ============================================
+// CSR Interface
+// ============================================
+reg csr_ifu_ic_en;
+reg csr_ifu_ic_en_pls;
+
+// ============================================
 // ICU Interface
 // ============================================
 wire [31:0] ifu_icu_addr_ic1;
@@ -16,6 +22,19 @@ wire ifu_icu_req_ic1;
 reg icu_ifu_ack_ic1;
 reg icu_ifu_data_valid_ic2;
 reg [63:0] icu_ifu_data_ic2;
+reg icu_ifu_fault_ic2;
+reg [1:0] icu_ifu_fault_code_ic2;
+
+// ============================================
+// BIU Interface
+// ============================================
+wire [31:0] ifu_biu_rd_addr;
+wire ifu_biu_rd_req;
+reg biu_ifu_rd_ack;
+reg biu_ifu_data_valid;
+reg [63:0] biu_ifu_data;
+reg biu_ifu_fault;
+reg [1:0] biu_ifu_fault_code;
 
 // ============================================
 // EXU Interface
@@ -28,7 +47,48 @@ reg exu_ifu_ertn;
 reg [31:0] exu_ifu_ert_addr;
 reg exu_ifu_stall;
 
+wire ifu_exu_vld_d;
+wire [31:0] ifu_exu_pc_d;
+wire [4:0] ifu_exu_rs1_d;
+wire [4:0] ifu_exu_rs2_d;
+wire [4:0] ifu_exu_rd_d;
+wire ifu_exu_wen_d;
+wire [31:0] ifu_exu_imm_shifted_d;
+wire ifu_exu_alu_vld_d;
+wire [5:0] ifu_exu_alu_op_d;
+wire ifu_exu_alu_a_pc_d;
+wire [31:0] ifu_exu_alu_c_d;
+wire ifu_exu_alu_double_word_d;
+wire ifu_exu_alu_b_imm_d;
+wire ifu_exu_lsu_vld_d;
+wire [6:0] ifu_exu_lsu_op_d;
+wire ifu_exu_lsu_double_read_d;
+wire ifu_exu_bru_vld_d;
+wire [3:0] ifu_exu_bru_op_d;
+wire [31:0] ifu_exu_bru_offset_d;
+wire ifu_exu_mul_vld_d;
+wire ifu_exu_mul_signed_d;
+wire ifu_exu_mul_double_d;
+wire ifu_exu_mul_hi_d;
+wire ifu_exu_mul_short_d;
+wire ifu_exu_div_vld_d;
+wire ifu_exu_div_signed_d;
+wire ifu_exu_div_mod_d;
+wire ifu_exu_csr_vld_d;
+wire [13:0] ifu_exu_csr_raddr_d;
+wire ifu_exu_csr_xchg_d;
+wire ifu_exu_csr_wen_d;
+wire [13:0] ifu_exu_csr_waddr_d;
+wire ifu_exu_csr_rdtimel_d;
+wire ifu_exu_csr_rdtimeh_d;
+wire ifu_exu_ertn_vld_d;
+wire ifu_exu_exc_vld_d;
+wire [5:0] ifu_exu_exc_code_d;
+wire [31:0] ifu_exu_exc_badv_d;
+
+// ============================================
 // Test control
+// ============================================
 integer test_count;
 integer pass_count;
 integer fail_count;
@@ -46,8 +106,8 @@ c7bifu uut (
     .clk(clk),
     .resetn(resetn),
     
-    .csr_ifu_ic_en(1'b1),
-    .csr_ifu_ic_en_pls(1'b0),
+    .csr_ifu_ic_en(csr_ifu_ic_en),
+    .csr_ifu_ic_en_pls(csr_ifu_ic_en_pls),
 
     // ICU interface
     .ifu_icu_addr_ic1(ifu_icu_addr_ic1),
@@ -55,10 +115,18 @@ c7bifu uut (
     .icu_ifu_ack_ic1(icu_ifu_ack_ic1),
     .icu_ifu_data_valid_ic2(icu_ifu_data_valid_ic2),
     .icu_ifu_data_ic2(icu_ifu_data_ic2),
+    .icu_ifu_fault_ic2(icu_ifu_fault_ic2),
+    .icu_ifu_fault_code_ic2(icu_ifu_fault_code_ic2),
 
-    .biu_ifu_rd_ack(1'b0),
-    .biu_ifu_data_valid(1'b0),
-    
+    // BIU interface
+    .ifu_biu_rd_addr(ifu_biu_rd_addr),
+    .ifu_biu_rd_req(ifu_biu_rd_req),
+    .biu_ifu_rd_ack(biu_ifu_rd_ack),
+    .biu_ifu_data_valid(biu_ifu_data_valid),
+    .biu_ifu_data(biu_ifu_data),
+    .biu_ifu_fault(biu_ifu_fault),
+    .biu_ifu_fault_code(biu_ifu_fault_code),
+
     // EXU interface inputs
     .exu_ifu_except(exu_ifu_except),
     .exu_ifu_isr_addr(exu_ifu_isr_addr),
@@ -69,40 +137,46 @@ c7bifu uut (
     .exu_ifu_stall(exu_ifu_stall),
     
     // EXU interface outputs
-    .ifu_exu_vld_d(),
-    .ifu_exu_pc_d(),
-    .ifu_exu_rs1_d(),
-    .ifu_exu_rs2_d(),
-    .ifu_exu_rd_d(),
-    .ifu_exu_wen_d(),
-    .ifu_exu_imm_shifted_d(),
+    .ifu_exu_vld_d(ifu_exu_vld_d),
+    .ifu_exu_pc_d(ifu_exu_pc_d),
+    .ifu_exu_rs1_d(ifu_exu_rs1_d),
+    .ifu_exu_rs2_d(ifu_exu_rs2_d),
+    .ifu_exu_rd_d(ifu_exu_rd_d),
+    .ifu_exu_wen_d(ifu_exu_wen_d),
+    .ifu_exu_imm_shifted_d(ifu_exu_imm_shifted_d),
     
-    // Other outputs (not used in this test)
-    .ifu_exu_alu_vld_d(),
-    .ifu_exu_alu_op_d(),
-    .ifu_exu_alu_a_pc_d(),
-    .ifu_exu_alu_c_d(),
-    .ifu_exu_alu_double_word_d(),
-    .ifu_exu_alu_b_imm_d(),
-    .ifu_exu_lsu_vld_d(),
-    .ifu_exu_lsu_op_d(),
-    .ifu_exu_lsu_double_read_d(),
-    .ifu_exu_bru_vld_d(),
-    .ifu_exu_bru_op_d(),
-    .ifu_exu_bru_offset_d(),
-    .ifu_exu_mul_vld_d(),
-    .ifu_exu_mul_signed_d(),
-    .ifu_exu_mul_double_d(),
-    .ifu_exu_mul_hi_d(),
-    .ifu_exu_mul_short_d(),
-    .ifu_exu_csr_vld_d(),
-    .ifu_exu_csr_raddr_d(),
-    .ifu_exu_csr_xchg_d(),
-    .ifu_exu_csr_wen_d(),
-    .ifu_exu_csr_waddr_d(),
-    .ifu_exu_ertn_vld_d(),
-    .ifu_exu_exc_vld_d(),
-    .ifu_exu_exc_code_d()
+    // Other EXU outputs
+    .ifu_exu_alu_vld_d(ifu_exu_alu_vld_d),
+    .ifu_exu_alu_op_d(ifu_exu_alu_op_d),
+    .ifu_exu_alu_a_pc_d(ifu_exu_alu_a_pc_d),
+    .ifu_exu_alu_c_d(ifu_exu_alu_c_d),
+    .ifu_exu_alu_double_word_d(ifu_exu_alu_double_word_d),
+    .ifu_exu_alu_b_imm_d(ifu_exu_alu_b_imm_d),
+    .ifu_exu_lsu_vld_d(ifu_exu_lsu_vld_d),
+    .ifu_exu_lsu_op_d(ifu_exu_lsu_op_d),
+    .ifu_exu_lsu_double_read_d(ifu_exu_lsu_double_read_d),
+    .ifu_exu_bru_vld_d(ifu_exu_bru_vld_d),
+    .ifu_exu_bru_op_d(ifu_exu_bru_op_d),
+    .ifu_exu_bru_offset_d(ifu_exu_bru_offset_d),
+    .ifu_exu_mul_vld_d(ifu_exu_mul_vld_d),
+    .ifu_exu_mul_signed_d(ifu_exu_mul_signed_d),
+    .ifu_exu_mul_double_d(ifu_exu_mul_double_d),
+    .ifu_exu_mul_hi_d(ifu_exu_mul_hi_d),
+    .ifu_exu_mul_short_d(ifu_exu_mul_short_d),
+    .ifu_exu_div_vld_d(ifu_exu_div_vld_d),
+    .ifu_exu_div_signed_d(ifu_exu_div_signed_d),
+    .ifu_exu_div_mod_d(ifu_exu_div_mod_d),
+    .ifu_exu_csr_vld_d(ifu_exu_csr_vld_d),
+    .ifu_exu_csr_raddr_d(ifu_exu_csr_raddr_d),
+    .ifu_exu_csr_xchg_d(ifu_exu_csr_xchg_d),
+    .ifu_exu_csr_wen_d(ifu_exu_csr_wen_d),
+    .ifu_exu_csr_waddr_d(ifu_exu_csr_waddr_d),
+    .ifu_exu_csr_rdtimel_d(ifu_exu_csr_rdtimel_d),
+    .ifu_exu_csr_rdtimeh_d(ifu_exu_csr_rdtimeh_d),
+    .ifu_exu_ertn_vld_d(ifu_exu_ertn_vld_d),
+    .ifu_exu_exc_vld_d(ifu_exu_exc_vld_d),
+    .ifu_exu_exc_code_d(ifu_exu_exc_code_d),
+    .ifu_exu_exc_badv_d(ifu_exu_exc_badv_d)
 );
 
 // ============================================
@@ -195,6 +269,15 @@ end
 // Initialize signals
 task init_signals;
 begin
+    csr_ifu_ic_en = 1'b1;
+    csr_ifu_ic_en_pls = 1'b0;
+    icu_ifu_fault_ic2 = 1'b0;
+    icu_ifu_fault_code_ic2 = 2'b0;
+    biu_ifu_rd_ack = 1'b0;
+    biu_ifu_data_valid = 1'b0;
+    biu_ifu_data = 64'h0;
+    biu_ifu_fault = 1'b0;
+    biu_ifu_fault_code = 2'b0;
     exu_ifu_except = 1'b0;
     exu_ifu_isr_addr = 32'h0;
     exu_ifu_branch = 1'b0;
@@ -312,21 +395,17 @@ begin
         stream_ok = 1;
         for (i = 0; i < 20; i = i + 1) begin
             advance_cycles(1);
-            if (uut.ifu_exu_vld_d === 1'b1) begin
+            if (ifu_exu_vld_d === 1'b1) begin
                 vld_count = vld_count + 1;
-                $display("    Cycle %0d: Instruction valid, PC=%h", cycle_counter, uut.ifu_exu_pc_d);
+                $display("    Cycle %0d: Instruction valid, PC=%h", cycle_counter, ifu_exu_pc_d);
                 // Check instruction stream continuity
-                check_instruction_stream(uut.ifu_exu_pc_d, 0);
+                check_instruction_stream(ifu_exu_pc_d, 0);
             end
         end
         
         // Check results - should get valid instructions
         test_passed = (vld_count > 0) ? 1 : 0;
         check_test_result(test_passed, "normal_fetch: Should get valid instructions");
-        
-        // Check that ICU protocol worked
-        //test_passed = (icu_ifu_ack_ic1 === 1'b1 || icu_ifu_data_valid_ic2 === 1'b1) ? 1 : 0;
-        //check_test_result(test_passed, "normal_fetch: ICU should respond with ACK and data");
         
         // Check instruction count
         $display("  Total instructions fetched: %0d", instruction_count);
@@ -370,9 +449,9 @@ begin
     pc_before_stall = -1;
     for (i = 0; i < 5; i = i + 1) begin
         advance_cycles(1);
-        if (uut.ifu_exu_vld_d === 1'b1) begin
+        if (ifu_exu_vld_d === 1'b1) begin
             instructions_before_stall = instructions_before_stall + 1;
-            pc_before_stall = uut.ifu_exu_pc_d;
+            pc_before_stall = ifu_exu_pc_d;
             $display("  Before stall: Instruction %0d, PC=%h", instructions_before_stall, pc_before_stall);
         end
     end
@@ -386,10 +465,10 @@ begin
     instructions_during_stall = 0;
     for (i = 0; i < 8; i = i + 1) begin
         advance_cycles(1);
-        if (uut.ifu_exu_vld_d === 1'b1) begin
+        if (ifu_exu_vld_d === 1'b1) begin
             instructions_during_stall = instructions_during_stall + 1;
             $display("    Cycle %0d: Got valid during stall (UNEXPECTED!), PC=%h", 
-                     cycle_counter, uut.ifu_exu_pc_d);
+                     cycle_counter, ifu_exu_pc_d);
         end
     end
     
@@ -401,21 +480,14 @@ begin
     exu_ifu_stall = 1'b0;
     $display("  Stall released at cycle %0d", cycle_counter);
     
-    // Wait a bit for pipeline to clear
-    //advance_cycles(2);
-    
-    // Check that requests resume
-    //test_passed = (ifu_icu_req_ic1 === 1'b1) ? 1 : 0;
-    //check_test_result(test_passed, "stall_recovery: Request should resume after stall");
-    
     // Check sequential continuation after stall
     instructions_after_stall = 0;
     pc_after_stall = -1;
     for (i = 0; i < 10; i = i + 1) begin
         advance_cycles(1);
-        if (uut.ifu_exu_vld_d === 1'b1) begin
+        if (ifu_exu_vld_d === 1'b1) begin
             instructions_after_stall = instructions_after_stall + 1;
-            pc_after_stall = uut.ifu_exu_pc_d;
+            pc_after_stall = ifu_exu_pc_d;
             $display("  After stall: Instruction %0d, PC=%h", 
                      instructions_after_stall, pc_after_stall);
             // Check that PC continues sequentially from before stall
@@ -463,10 +535,10 @@ begin
     instructions_before_branch = 0;
     for (i = 0; i < 5; i = i + 1) begin
         advance_cycles(1);
-        if (uut.ifu_exu_vld_d === 1'b1) begin
+        if (ifu_exu_vld_d === 1'b1) begin
             instructions_before_branch = instructions_before_branch + 1;
             $display("  Before branch: Instruction %0d, PC=%h", 
-                     instructions_before_branch, uut.ifu_exu_pc_d);
+                     instructions_before_branch, ifu_exu_pc_d);
         end
     end
     
@@ -479,27 +551,27 @@ begin
     exu_ifu_branch = 1'b0;
     
     // Wait for address to update
-    //advance_cycles(3);
+    advance_cycles(1);
     
     // Check address updated
     test_passed = (ifu_icu_addr_ic1 === expected_addr) ? 1 : 0;
     check_test_result(test_passed, "branch_flush: Address should update to branch target");
     
     // Wait for ICU to respond to new address
-    //advance_cycles(5);
+    advance_cycles(3);
     
     // Check instructions from branch target
     instructions_after_branch = 0;
     first_pc_after_branch = -1;
     for (i = 0; i < 8; i = i + 1) begin
         advance_cycles(1);
-        if (uut.ifu_exu_vld_d === 1'b1) begin
+        if (ifu_exu_vld_d === 1'b1) begin
             instructions_after_branch = instructions_after_branch + 1;
             if (first_pc_after_branch < 0) begin
-                first_pc_after_branch = uut.ifu_exu_pc_d;
+                first_pc_after_branch = ifu_exu_pc_d;
             end
             $display("  After branch: Instruction %0d, PC=%h", 
-                     instructions_after_branch, uut.ifu_exu_pc_d);
+                     instructions_after_branch, ifu_exu_pc_d);
         end
     end
     
@@ -541,8 +613,8 @@ begin
     // Get a few instructions before exception
     for (i = 0; i < 5; i = i + 1) begin
         advance_cycles(1);
-        if (uut.ifu_exu_vld_d === 1'b1) begin
-            $display("  Before exception: PC=%h", uut.ifu_exu_pc_d);
+        if (ifu_exu_vld_d === 1'b1) begin
+            $display("  Before exception: PC=%h", ifu_exu_pc_d);
         end
     end
     
@@ -555,24 +627,27 @@ begin
     exu_ifu_except = 1'b0;
     
     // Wait for address to update
-    //advance_cycles(3);
+    advance_cycles(2);
     
     // Check address updated
     test_passed = (ifu_icu_addr_ic1 === expected_addr) ? 1 : 0;
     check_test_result(test_passed, "exception_flush: Address should update to ISR address");
+    
+    // Wait for ICU response
+    advance_cycles(3);
     
     // Check instructions from ISR
     instructions_after_exception = 0;
     first_pc_after_exception = -1;
     for (i = 0; i < 10; i = i + 1) begin
         advance_cycles(1);
-        if (uut.ifu_exu_vld_d === 1'b1) begin
+        if (ifu_exu_vld_d === 1'b1) begin
             instructions_after_exception = instructions_after_exception + 1;
             if (first_pc_after_exception < 0) begin
-                first_pc_after_exception = uut.ifu_exu_pc_d;
+                first_pc_after_exception = ifu_exu_pc_d;
             end
             $display("  After exception: Instruction %0d, PC=%h", 
-                     instructions_after_exception, uut.ifu_exu_pc_d);
+                     instructions_after_exception, ifu_exu_pc_d);
         end
     end
     
@@ -608,13 +683,14 @@ begin
     reset_dut;
     expected_addr = 32'h1c000200;
     
-    //advance_cycles(5);
+    // Let IFU start
+    advance_cycles(1);
     
     // Get a few instructions before ERTN
     for (i = 0; i < 8; i = i + 1) begin
         advance_cycles(1);
-        if (uut.ifu_exu_vld_d === 1'b1) begin
-            $display("  Before ERTN: PC=%h", uut.ifu_exu_pc_d);
+        if (ifu_exu_vld_d === 1'b1) begin
+            $display("  Before ERTN: PC=%h", ifu_exu_pc_d);
         end
     end
     
@@ -627,24 +703,27 @@ begin
     exu_ifu_ertn = 1'b0;
     
     // Wait for address to update
-    //advance_cycles(3);
+    advance_cycles(2);
     
     // Check address updated
     test_passed = (ifu_icu_addr_ic1 === expected_addr) ? 1 : 0;
     check_test_result(test_passed, "ertn_flush: Address should update to ERT address");
+    
+    // Wait for ICU response
+    advance_cycles(3);
     
     // Check instructions from ERT
     instructions_after_ertn = 0;
     first_pc_after_ertn = -1;
     for (i = 0; i < 10; i = i + 1) begin
         advance_cycles(1);
-        if (uut.ifu_exu_vld_d === 1'b1) begin
+        if (ifu_exu_vld_d === 1'b1) begin
             instructions_after_ertn = instructions_after_ertn + 1;
             if (first_pc_after_ertn < 0) begin
-                first_pc_after_ertn = uut.ifu_exu_pc_d;
+                first_pc_after_ertn = ifu_exu_pc_d;
             end
             $display("  After ERTN: Instruction %0d, PC=%h", 
-                     instructions_after_ertn, uut.ifu_exu_pc_d);
+                     instructions_after_ertn, ifu_exu_pc_d);
         end
     end
     
@@ -692,10 +771,10 @@ begin
     instructions_before_stall = 0;
     for (i = 0; i < 7; i = i + 1) begin
         advance_cycles(1);
-        if (uut.ifu_exu_vld_d === 1'b1) begin
+        if (ifu_exu_vld_d === 1'b1) begin
             instructions_before_stall = instructions_before_stall + 1;
             $display("  Before stall: Instruction %0d, PC=%h", 
-                     instructions_before_stall, uut.ifu_exu_pc_d);
+                     instructions_before_stall, ifu_exu_pc_d);
         end
     end
     
@@ -717,9 +796,9 @@ begin
     instructions_during_stall = 0;
     for (i = 0; i < 4; i = i + 1) begin
         advance_cycles(1);
-        if (uut.ifu_exu_vld_d === 1'b1) begin
+        if (ifu_exu_vld_d === 1'b1) begin
             instructions_during_stall = instructions_during_stall + 1;
-            $display("    ERROR: Got valid during stall+flush, PC=%h", uut.ifu_exu_pc_d);
+            $display("    ERROR: Got valid during stall+flush, PC=%h", ifu_exu_pc_d);
         end
     end
     
@@ -732,26 +811,28 @@ begin
     $display("  Stall released at cycle %0d", cycle_counter);
     
     // Wait for address to update
-    //advance_cycles(3);
+    advance_cycles(2);
    
-    // During stall, fetch is still going on, it should fetch address after
-    // except target already. 
-    // Check address updated to branch target
+    // Check address updated to exception target
     test_passed = (ifu_icu_addr_ic1 >= except_target) ? 1 : 0;
     check_test_result(test_passed, "combined_addr: Should fetch from except target even during stall.");
+    
+    // Wait for ICU response
+    //advance_cycles(3);
+    // The previous advance_cycles(2) is what is needed for an icache hit.
     
     // Check instructions from branch target
     instructions_after_release = 0;
     first_pc_after_release = -1;
     for (i = 0; i < 10; i = i + 1) begin
         advance_cycles(1);
-        if (uut.ifu_exu_vld_d === 1'b1) begin
+        if (ifu_exu_vld_d === 1'b1) begin
             instructions_after_release = instructions_after_release + 1;
             if (first_pc_after_release < 0) begin
-                first_pc_after_release = uut.ifu_exu_pc_d;
+                first_pc_after_release = ifu_exu_pc_d;
             end
             $display("  After release: Instruction %0d, PC=%h", 
-                     instructions_after_release, uut.ifu_exu_pc_d);
+                     instructions_after_release, ifu_exu_pc_d);
         end
     end
     
@@ -763,6 +844,7 @@ begin
     if (first_pc_after_release >= 0) begin
         test_passed = (first_pc_after_release === except_target) ? 1 : 0;
         check_test_result(test_passed, "combined_stream: First instruction should be at except target");
+        $display("  First PC after stall release: PC=%h", first_pc_after_release); 
     end
     
     advance_cycles(5);
@@ -789,11 +871,11 @@ initial begin
     #10;
     
     // Run all tests
-//    test_normal_fetch;
-//    test_stall_operation;
-//    test_branch_flush;
-//    test_exception_flush;
-//    test_ertn_flush;
+    test_normal_fetch;
+    test_stall_operation;
+    test_branch_flush;
+    test_exception_flush;
+    test_ertn_flush;
     test_combined_stall_flush;
     
     // Summary
@@ -807,9 +889,35 @@ initial begin
     
     if (fail_count == 0) begin
         $display("\nSUCCESS: All tests PASSED!");
+        $display("\nPASS!\n");
+        $display("\033[0;32m");
+        $display("**************************************************");
+        $display("*                                                *");
+        $display("*      * * *       *        * * *     * * *      *");
+        $display("*      *    *     * *      *         *           *");
+        $display("*      * * *     *   *      * * *     * * *      *");
+        $display("*      *        * * * *          *         *     *");
+        $display("*      *       *       *    * * *     * * *      *");
+        $display("*                                                *");
+        $display("**************************************************");
+        $display("\n");
+        $display("\033[0m");
     end
     else begin
         $display("\nFAILURE: %0d test(s) FAILED!", fail_count);
+        $display("\nFAIL!\n");
+        $display("\033[0;31m");
+        $display("**************************************************");
+        $display("*                                                *");
+        $display("*      * * *       *         ***      *          *");
+        $display("*      *          * *         *       *          *");
+        $display("*      * * *     *   *        *       *          *");
+        $display("*      *        * * * *       *       *          *");
+        $display("*      *       *       *     ***      * * *      *");
+        $display("*                                                *");
+        $display("**************************************************");
+        $display("\n");
+        $display("\033[0m");
     end
     
     $display("==========================================\n");
@@ -824,7 +932,7 @@ end
 always @(posedge clk) begin
     if (resetn === 1'b1 && cycle_counter > 0) begin
         $display("MONITOR[%0d]: vld=%b, req=%b, ack=%b, data_vld=%b, stall=%b, addr=%h",
-                 cycle_counter, uut.ifu_exu_vld_d, ifu_icu_req_ic1, icu_ifu_ack_ic1,
+                 cycle_counter, ifu_exu_vld_d, ifu_icu_req_ic1, icu_ifu_ack_ic1,
                  icu_ifu_data_valid_ic2, exu_ifu_stall, ifu_icu_addr_ic1);
     end
 end

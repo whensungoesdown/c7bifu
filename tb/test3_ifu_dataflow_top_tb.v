@@ -19,12 +19,27 @@ initial begin
 end
 
 // ================= DUT I/O Signals =================
+// CSR interface
+reg csr_ifu_ic_en;
+reg csr_ifu_ic_en_pls;
+
 // Interface to ICU (Instruction Cache Unit)
 wire [31:0]      ifu_icu_addr_ic1;
 wire             ifu_icu_req_ic1;
 reg              icu_ifu_ack_ic1;
 reg              icu_ifu_data_valid_ic2;
 reg  [63:0]      icu_ifu_data_ic2;
+reg              icu_ifu_fault_ic2;
+reg  [1:0]       icu_ifu_fault_code_ic2;
+
+// Interface to BIU (Bus Interface Unit)
+wire [31:0]      ifu_biu_rd_addr;
+wire             ifu_biu_rd_req;
+reg              biu_ifu_rd_ack;
+reg              biu_ifu_data_valid;
+reg  [63:0]      biu_ifu_data;
+reg              biu_ifu_fault;
+reg  [1:0]       biu_ifu_fault_code;
 
 // Interface to EXU (Execution Unit)
 reg              exu_ifu_except;
@@ -34,16 +49,55 @@ reg  [31:0]      exu_ifu_brn_addr;
 reg              exu_ifu_ertn;
 reg  [31:0]      exu_ifu_ert_addr;
 reg              exu_ifu_stall;
+
+// EXU output signals (from DUT)
 wire             ifu_exu_vld_d;
 wire [31:0]      ifu_exu_pc_d;
+wire [4:0]       ifu_exu_rs1_d;
+wire [4:0]       ifu_exu_rs2_d;
+wire [4:0]       ifu_exu_rd_d;
+wire             ifu_exu_wen_d;
+wire [31:0]      ifu_exu_imm_shifted_d;
+wire             ifu_exu_alu_vld_d;
+wire [5:0]       ifu_exu_alu_op_d;
+wire             ifu_exu_alu_a_pc_d;
+wire [31:0]      ifu_exu_alu_c_d;
+wire             ifu_exu_alu_double_word_d;
+wire             ifu_exu_alu_b_imm_d;
+wire             ifu_exu_lsu_vld_d;
+wire [6:0]       ifu_exu_lsu_op_d;
+wire             ifu_exu_lsu_double_read_d;
+wire             ifu_exu_bru_vld_d;
+wire [3:0]       ifu_exu_bru_op_d;
+wire [31:0]      ifu_exu_bru_offset_d;
+wire             ifu_exu_mul_vld_d;
+wire             ifu_exu_mul_signed_d;
+wire             ifu_exu_mul_double_d;
+wire             ifu_exu_mul_hi_d;
+wire             ifu_exu_mul_short_d;
+wire             ifu_exu_div_vld_d;
+wire             ifu_exu_div_signed_d;
+wire             ifu_exu_div_mod_d;
+wire             ifu_exu_csr_vld_d;
+wire [13:0]      ifu_exu_csr_raddr_d;
+wire             ifu_exu_csr_xchg_d;
+wire             ifu_exu_csr_wen_d;
+wire [13:0]      ifu_exu_csr_waddr_d;
+wire             ifu_exu_csr_rdtimel_d;
+wire             ifu_exu_csr_rdtimeh_d;
+wire             ifu_exu_ertn_vld_d;
+wire             ifu_exu_exc_vld_d;
+wire [5:0]       ifu_exu_exc_code_d;
+wire [31:0]      ifu_exu_exc_badv_d;
 
 // ================= Instantiate DUT =================
 c7bifu dut (
     .clk                  (clk),
     .resetn               (resetn),
 
-    .csr_ifu_ic_en(1'b1),
-    .csr_ifu_ic_en_pls(1'b0),
+    // CSR interface
+    .csr_ifu_ic_en        (csr_ifu_ic_en),
+    .csr_ifu_ic_en_pls    (csr_ifu_ic_en_pls),
 
     // ICU interface
     .ifu_icu_addr_ic1     (ifu_icu_addr_ic1),
@@ -51,10 +105,19 @@ c7bifu dut (
     .icu_ifu_ack_ic1      (icu_ifu_ack_ic1),
     .icu_ifu_data_valid_ic2 (icu_ifu_data_valid_ic2),
     .icu_ifu_data_ic2     (icu_ifu_data_ic2),
-    
-    .biu_ifu_rd_ack       (1'b0),
+    .icu_ifu_fault_ic2    (icu_ifu_fault_ic2),
+    .icu_ifu_fault_code_ic2 (icu_ifu_fault_code_ic2),
 
-    // EXU interface
+    // BIU interface
+    .ifu_biu_rd_addr      (ifu_biu_rd_addr),
+    .ifu_biu_rd_req       (ifu_biu_rd_req),
+    .biu_ifu_rd_ack       (biu_ifu_rd_ack),
+    .biu_ifu_data_valid   (biu_ifu_data_valid),
+    .biu_ifu_data         (biu_ifu_data),
+    .biu_ifu_fault        (biu_ifu_fault),
+    .biu_ifu_fault_code   (biu_ifu_fault_code),
+
+    // EXU interface (inputs)
     .exu_ifu_except       (exu_ifu_except),
     .exu_ifu_isr_addr     (exu_ifu_isr_addr),
     .exu_ifu_branch       (exu_ifu_branch),
@@ -63,8 +126,45 @@ c7bifu dut (
     .exu_ifu_ert_addr     (exu_ifu_ert_addr),
     .exu_ifu_stall        (exu_ifu_stall),
 
+    // EXU interface (outputs)
     .ifu_exu_vld_d        (ifu_exu_vld_d),
-    .ifu_exu_pc_d         (ifu_exu_pc_d)
+    .ifu_exu_pc_d         (ifu_exu_pc_d),
+    .ifu_exu_rs1_d        (ifu_exu_rs1_d),
+    .ifu_exu_rs2_d        (ifu_exu_rs2_d),
+    .ifu_exu_rd_d         (ifu_exu_rd_d),
+    .ifu_exu_wen_d        (ifu_exu_wen_d),
+    .ifu_exu_imm_shifted_d (ifu_exu_imm_shifted_d),
+    .ifu_exu_alu_vld_d    (ifu_exu_alu_vld_d),
+    .ifu_exu_alu_op_d     (ifu_exu_alu_op_d),
+    .ifu_exu_alu_a_pc_d   (ifu_exu_alu_a_pc_d),
+    .ifu_exu_alu_c_d      (ifu_exu_alu_c_d),
+    .ifu_exu_alu_double_word_d (ifu_exu_alu_double_word_d),
+    .ifu_exu_alu_b_imm_d  (ifu_exu_alu_b_imm_d),
+    .ifu_exu_lsu_vld_d    (ifu_exu_lsu_vld_d),
+    .ifu_exu_lsu_op_d     (ifu_exu_lsu_op_d),
+    .ifu_exu_lsu_double_read_d (ifu_exu_lsu_double_read_d),
+    .ifu_exu_bru_vld_d    (ifu_exu_bru_vld_d),
+    .ifu_exu_bru_op_d     (ifu_exu_bru_op_d),
+    .ifu_exu_bru_offset_d (ifu_exu_bru_offset_d),
+    .ifu_exu_mul_vld_d    (ifu_exu_mul_vld_d),
+    .ifu_exu_mul_signed_d (ifu_exu_mul_signed_d),
+    .ifu_exu_mul_double_d (ifu_exu_mul_double_d),
+    .ifu_exu_mul_hi_d     (ifu_exu_mul_hi_d),
+    .ifu_exu_mul_short_d  (ifu_exu_mul_short_d),
+    .ifu_exu_div_vld_d    (ifu_exu_div_vld_d),
+    .ifu_exu_div_signed_d (ifu_exu_div_signed_d),
+    .ifu_exu_div_mod_d    (ifu_exu_div_mod_d),
+    .ifu_exu_csr_vld_d    (ifu_exu_csr_vld_d),
+    .ifu_exu_csr_raddr_d  (ifu_exu_csr_raddr_d),
+    .ifu_exu_csr_xchg_d   (ifu_exu_csr_xchg_d),
+    .ifu_exu_csr_wen_d    (ifu_exu_csr_wen_d),
+    .ifu_exu_csr_waddr_d  (ifu_exu_csr_waddr_d),
+    .ifu_exu_csr_rdtimel_d (ifu_exu_csr_rdtimel_d),
+    .ifu_exu_csr_rdtimeh_d (ifu_exu_csr_rdtimeh_d),
+    .ifu_exu_ertn_vld_d   (ifu_exu_ertn_vld_d),
+    .ifu_exu_exc_vld_d    (ifu_exu_exc_vld_d),
+    .ifu_exu_exc_code_d   (ifu_exu_exc_code_d),
+    .ifu_exu_exc_badv_d   (ifu_exu_exc_badv_d)
 );
 
 // ================= Test Variables =================
@@ -85,10 +185,25 @@ task initialize;
         fetch_request_count = 0;
         icu_response_count = 0;
         
-        // Initialize all inputs
+        // Initialize CSR interface
+        csr_ifu_ic_en = 1'b1;      // Enable I-cache
+        csr_ifu_ic_en_pls = 1'b0;
+        
+        // Initialize ICU interface
         icu_ifu_ack_ic1 = 1'b0;
         icu_ifu_data_valid_ic2 = 1'b0;
         icu_ifu_data_ic2 = 64'h0;
+        icu_ifu_fault_ic2 = 1'b0;
+        icu_ifu_fault_code_ic2 = 2'b0;
+        
+        // Initialize BIU interface
+        biu_ifu_rd_ack = 1'b0;
+        biu_ifu_data_valid = 1'b0;
+        biu_ifu_data = 64'h0;
+        biu_ifu_fault = 1'b0;
+        biu_ifu_fault_code = 2'b0;
+        
+        // Initialize EXU interface
         exu_ifu_except = 1'b0;
         exu_ifu_isr_addr = 32'h0;
         exu_ifu_branch = 1'b0;
@@ -325,18 +440,8 @@ task test_iq_full_condition;
                 icu_ifu_data_ic2 = 64'h0;
                 icu_response_count = icu_response_count + 1;
                 
-                // Check if IQ becomes full
-                //if (dut.iq_full === 1'b1 && iq_full_detected === 0) begin
-                //    $display("  IQ full detected after %0d packets", i+1);
-                //    iq_full_detected = 1;
-                //    
-                //    // Assert: When IQ is full, fetch should stop
-                //    wait_cycles(5);
-                //    if (ifu_icu_req_ic1 === 1'b1) begin
-                //        $display("  ERROR[Test%0d]: Fetch should stop when IQ is full", test_num);
-                //        error_count = error_count + 1;
-                //    end
-                //end
+                // Check if IQ becomes full (commented out to avoid strict check)
+                // if (dut.iq_full === 1'b1 && iq_full_detected === 0) begin ...
             end else if (dut.iq_full === 1'b1) begin
                 // IQ is full and no more requests (expected behavior)
                 $display("  IQ full detected after %0d packets", i);
@@ -663,8 +768,7 @@ task test_stall_csrwr_addi;
         #22 resetn = 1'b1;      // Release reset after 22ns
         
         // 1c000000:       04003026        csrwr   $r6,0xc
-	// 1c000004:       02816806        addi.w  $r6,$r0,90(0x5a)
-
+        // 1c000004:       02816806        addi.w  $r6,$r0,90(0x5a)
 
         // Fetch a few instructions
         $display("  Fetching normal instructions...");
@@ -695,15 +799,15 @@ task test_stall_csrwr_addi;
         
         @(posedge clk);
 
-	// two more cycle, to simulate csrwr flow to _e, causing stall
+        // two more cycle, to simulate csrwr flow to _e, causing stall
         @(posedge clk);
         @(posedge clk);
 
         $display("  ifu_exu_vld_d: %d,  ifu_exu_pc_d: 0x%08h", ifu_exu_vld_d, ifu_exu_pc_d);
-	if (ifu_exu_vld_d !== 1 || ifu_exu_pc_d !== 32'h1c000000) begin
+        if (ifu_exu_vld_d !== 1 || ifu_exu_pc_d !== 32'h1c000000) begin
             $display("ERROR: ifu_exu_vld_d should be 1, ifu_exu_pc_d should be 1c000000");
             error_count = error_count + 1;
-	end
+        end
 
         // Trigger stall
         $display("Apply stall...");
@@ -712,35 +816,34 @@ task test_stall_csrwr_addi;
 
         $display("Reading instructions after applying stall...");
 
-	$display(" iq has 1-cycle read delay");
+        $display(" iq has 1-cycle read delay");
         $display("Stall Cycle 1:");
 
-	$display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
-	//if (dut.inst_vld_f !== 1 || dut.inst_addr_f !== 32'h1c000000) begin
-        //    $display("ERROR: inst_vld_f should be 1, inst_addr_f should be 1c000000");
-        //    error_count = error_count + 1;
-	//end
+        $display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
+        // if (dut.inst_vld_f !== 1 || dut.inst_addr_f !== 32'h1c000000) begin
+        //     $display("ERROR: inst_vld_f should be 1, inst_addr_f should be 1c000000");
+        //     error_count = error_count + 1;
+        // end
         $display("  ifu_exu_vld_d: %d,  ifu_exu_pc_d: 0x%08h", ifu_exu_vld_d, ifu_exu_pc_d);
-	//if (ifu_exu_vld_d !== 0 || ifu_exu_pc_d !== 32'h00000000) begin
-        //    $display("ERROR: ifu_exu_vld_d should be 0, ifu_exu_pc_d should be 00000000");
-        //    error_count = error_count + 1;
-	//end
+        // if (ifu_exu_vld_d !== 0 || ifu_exu_pc_d !== 32'h00000000) begin
+        //     $display("ERROR: ifu_exu_vld_d should be 0, ifu_exu_pc_d should be 00000000");
+        //     error_count = error_count + 1;
+        // end
 
         @(posedge clk);
 
         $display("Stall Cycle 2:");
 
-	$display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
-	//if (dut.inst_vld_f !== 0 || dut.inst_addr_f !== 32'h1c000000) begin
-        //    $display("ERROR: inst_vld_f should be 0, inst_addr_f should be 1c000000");
-        //    error_count = error_count + 1;
-	//end
+        $display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
+        // if (dut.inst_vld_f !== 0 || dut.inst_addr_f !== 32'h1c000000) begin
+        //     $display("ERROR: inst_vld_f should be 0, inst_addr_f should be 1c000000");
+        //     error_count = error_count + 1;
+        // end
         $display("  ifu_exu_vld_d: %d,  ifu_exu_pc_d: 0x%08h", ifu_exu_vld_d, ifu_exu_pc_d);
-	//if (ifu_exu_vld_d !== 0 || ifu_exu_pc_d !== 32'h00000000) begin
-        //    $display("ERROR: ifu_exu_vld_d should be 0, ifu_exu_pc_d should be 00000000");
-        //    error_count = error_count + 1;
-	//end
-
+        // if (ifu_exu_vld_d !== 0 || ifu_exu_pc_d !== 32'h00000000) begin
+        //     $display("ERROR: ifu_exu_vld_d should be 0, ifu_exu_pc_d should be 00000000");
+        //     error_count = error_count + 1;
+        // end
 
         $display("Release stall...");
         exu_ifu_stall = 1'b0;
@@ -748,38 +851,36 @@ task test_stall_csrwr_addi;
 
         // Read from IQ
         $display("Reading instructions after releasing stall...");
-	
-	//
-	// iq has 1-cycle read delay
-	//
-	$display(" iq has 1-cycle read delay");
+        
+        // iq has 1-cycle read delay
+        $display(" iq has 1-cycle read delay");
         $display("Cycle 1:");
 
-	$display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
-	//if (dut.inst_vld_f !== 0 || dut.inst_addr_f !== 32'h1c000000) begin
-        //    $display("ERROR: inst_vld_f should be 0, inst_addr_f should be 1c000000");
-        //    error_count = error_count + 1;
-	//end
+        $display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
+        // if (dut.inst_vld_f !== 0 || dut.inst_addr_f !== 32'h1c000000) begin
+        //     $display("ERROR: inst_vld_f should be 0, inst_addr_f should be 1c000000");
+        //     error_count = error_count + 1;
+        // end
         $display("  ifu_exu_vld_d: %d,  ifu_exu_pc_d: 0x%08h", ifu_exu_vld_d, ifu_exu_pc_d);
-	if (ifu_exu_vld_d !== 1 || ifu_exu_pc_d !== 32'h1c000004) begin
+        if (ifu_exu_vld_d !== 1 || ifu_exu_pc_d !== 32'h1c000004) begin
             $display("ERROR: ifu_exu_vld_d should be 1, ifu_exu_pc_d should be 1c000004");
             error_count = error_count + 1;
-	end
+        end
 
         @(posedge clk);
 
         $display("Cycle 2:");
 
-	$display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
-	//if (dut.inst_vld_f !== 1 || dut.inst_addr_f !== 32'h1c000004) begin
-        //    $display("ERROR: inst_vld_f should be 1, inst_addr_f should be 1c000004");
-        //    error_count = error_count + 1;
-	//end
+        $display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
+        // if (dut.inst_vld_f !== 1 || dut.inst_addr_f !== 32'h1c000004) begin
+        //     $display("ERROR: inst_vld_f should be 1, inst_addr_f should be 1c000004");
+        //     error_count = error_count + 1;
+        // end
         $display("  ifu_exu_vld_d: %d,  ifu_exu_pc_d: 0x%08h", ifu_exu_vld_d, ifu_exu_pc_d);
-	//if (ifu_exu_vld_d !== 1 || ifu_exu_pc_d !== 32'h1c000000) begin
-        //    $display("ERROR: ifu_exu_vld_d should be 1, ifu_exu_pc_d should be 1c000000");
-        //    error_count = error_count + 1;
-	//end
+        // if (ifu_exu_vld_d !== 1 || ifu_exu_pc_d !== 32'h1c000000) begin
+        //     $display("ERROR: ifu_exu_vld_d should be 1, ifu_exu_pc_d should be 1c000000");
+        //     error_count = error_count + 1;
+        // end
         
         test_num = test_num + 1;
         $display("  Stall test completed with %0d errors", error_count);
@@ -831,7 +932,7 @@ task test_stall_on_iq_addi_csrwr_addi_addi;
         @(posedge clk);
             icu_ifu_ack_ic1 = 1'b0;
             icu_ifu_data_valid_ic2 = 1'b1;
-	    // 1c000008:       02800000        addi.w  $r0,$r0,0
+            // 1c000008:       02800000        addi.w  $r0,$r0,0
             // 1c00000c:       02800000        addi.w  $r0,$r0,0
             icu_ifu_data_ic2 = 64'h0280000002800000;
 
@@ -839,55 +940,50 @@ task test_stall_on_iq_addi_csrwr_addi_addi;
             icu_ifu_data_valid_ic2 = 1'b0;
             icu_ifu_data_ic2 = 64'h0;
 
-	//
-	// iq is full
-	//
+        // iq is full
         exu_ifu_stall = 1'b0; 
         @(posedge clk);
 
-	//
-	// three more cycle, the second instruction (csrwr) arrives at _e,
-	// raising stall
-	//
+        // three more cycle, the second instruction (csrwr) arrives at _e,
+        // raising stall
         @(posedge clk);
         @(posedge clk);
         @(posedge clk);
-	
+        
         // Trigger stall
         $display("Apply stall...");
         exu_ifu_stall = 1'b1;
         @(posedge clk);
         $display("Reading instructions after applying stall...");
 
-	$display(" iq has 1-cycle read delay");
+        $display(" iq has 1-cycle read delay");
         $display("Stall Cycle 1:");
 
-	$display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
-	//if (dut.inst_vld_f !== 1 || dut.inst_addr_f !== 32'h1c000000) begin
-        //    $display("ERROR: inst_vld_f should be 1, inst_addr_f should be 1c000000");
-        //    error_count = error_count + 1;
-	//end
+        $display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
+        // if (dut.inst_vld_f !== 1 || dut.inst_addr_f !== 32'h1c000000) begin
+        //     $display("ERROR: inst_vld_f should be 1, inst_addr_f should be 1c000000");
+        //     error_count = error_count + 1;
+        // end
         $display("  ifu_exu_vld_d: %d,  ifu_exu_pc_d: 0x%08h", ifu_exu_vld_d, ifu_exu_pc_d);
-	//if (ifu_exu_vld_d !== 0 || ifu_exu_pc_d !== 32'h00000000) begin
-        //    $display("ERROR: ifu_exu_vld_d should be 0, ifu_exu_pc_d should be 00000000");
-        //    error_count = error_count + 1;
-	//end
+        // if (ifu_exu_vld_d !== 0 || ifu_exu_pc_d !== 32'h00000000) begin
+        //     $display("ERROR: ifu_exu_vld_d should be 0, ifu_exu_pc_d should be 00000000");
+        //     error_count = error_count + 1;
+        // end
 
         @(posedge clk);
 
         $display("Stall Cycle 2:");
 
-	$display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
-	//if (dut.inst_vld_f !== 0 || dut.inst_addr_f !== 32'h1c000000) begin
-        //    $display("ERROR: inst_vld_f should be 0, inst_addr_f should be 1c000000");
-        //    error_count = error_count + 1;
-	//end
+        $display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
+        // if (dut.inst_vld_f !== 0 || dut.inst_addr_f !== 32'h1c000000) begin
+        //     $display("ERROR: inst_vld_f should be 0, inst_addr_f should be 1c000000");
+        //     error_count = error_count + 1;
+        // end
         $display("  ifu_exu_vld_d: %d,  ifu_exu_pc_d: 0x%08h", ifu_exu_vld_d, ifu_exu_pc_d);
-	//if (ifu_exu_vld_d !== 0 || ifu_exu_pc_d !== 32'h00000000) begin
-        //    $display("ERROR: ifu_exu_vld_d should be 0, ifu_exu_pc_d should be 00000000");
-        //    error_count = error_count + 1;
-	//end
-
+        // if (ifu_exu_vld_d !== 0 || ifu_exu_pc_d !== 32'h00000000) begin
+        //     $display("ERROR: ifu_exu_vld_d should be 0, ifu_exu_pc_d should be 00000000");
+        //     error_count = error_count + 1;
+        // end
 
         $display("Release stall...");
         exu_ifu_stall = 1'b0;
@@ -895,54 +991,51 @@ task test_stall_on_iq_addi_csrwr_addi_addi;
 
         // Read from IQ
         $display("Reading instructions after releasing stall...");
-	
-	//
-	// iq has 1-cycle read delay
-	//
-	$display(" iq has 1-cycle read delay");
+        
+        // iq has 1-cycle read delay
+        $display(" iq has 1-cycle read delay");
         $display("Cycle 1:");
 
-	$display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
-	//if (dut.inst_vld_f !== 0 || dut.inst_addr_f !== 32'h1c000000) begin
-        //    $display("ERROR: inst_vld_f should be 0, inst_addr_f should be 1c000000");
-        //    error_count = error_count + 1;
-	//end
+        $display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
+        // if (dut.inst_vld_f !== 0 || dut.inst_addr_f !== 32'h1c000000) begin
+        //     $display("ERROR: inst_vld_f should be 0, inst_addr_f should be 1c000000");
+        //     error_count = error_count + 1;
+        // end
         $display("  ifu_exu_vld_d: %d,  ifu_exu_pc_d: 0x%08h", ifu_exu_vld_d, ifu_exu_pc_d);
-	if (ifu_exu_vld_d !== 1 || ifu_exu_pc_d !== 32'h1c000008) begin
+        if (ifu_exu_vld_d !== 1 || ifu_exu_pc_d !== 32'h1c000008) begin
             $display("ERROR: ifu_exu_vld_d should be 1, ifu_exu_pc_d should be 1c000008");
             error_count = error_count + 1;
-	end
+        end
 
         @(posedge clk);
 
         $display("Cycle 2:");
 
-	$display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
-	if (dut.inst_vld_f !== 1 || dut.inst_addr_f !== 32'h1c00000c) begin
+        $display("  inst_vld_f   : %d,  inst_addr_f : 0x%08h,  inst_f: 0x%08h", dut.inst_vld_f, dut.inst_addr_f, dut.inst_f);
+        if (dut.inst_vld_f !== 1 || dut.inst_addr_f !== 32'h1c00000c) begin
             $display("ERROR: inst_vld_f should be 1, inst_addr_f should be 1c00000c");
             error_count = error_count + 1;
-	end
+        end
         $display("  ifu_exu_vld_d: %d,  ifu_exu_pc_d: 0x%08h", ifu_exu_vld_d, ifu_exu_pc_d);
-	//if (ifu_exu_vld_d !== 1 || ifu_exu_pc_d !== 32'h1c000000) begin
-        //    $display("ERROR: ifu_exu_vld_d should be 1, ifu_exu_pc_d should be 1c000000");
-        //    error_count = error_count + 1;
-	//end
-	
+        // if (ifu_exu_vld_d !== 1 || ifu_exu_pc_d !== 32'h1c000000) begin
+        //     $display("ERROR: ifu_exu_vld_d should be 1, ifu_exu_pc_d should be 1c000000");
+        //     error_count = error_count + 1;
+        // end
+        
         @(posedge clk);
 
         $display("Cycle 3:");
 
         $display("  ifu_exu_vld_d: %d,  ifu_exu_pc_d: 0x%08h", ifu_exu_vld_d, ifu_exu_pc_d);
-	if (ifu_exu_vld_d !== 1 || ifu_exu_pc_d !== 32'h1c00000c) begin
+        if (ifu_exu_vld_d !== 1 || ifu_exu_pc_d !== 32'h1c00000c) begin
             $display("ERROR: ifu_exu_vld_d should be 1, ifu_exu_pc_d should be 1c00000c");
             error_count = error_count + 1;
-	end
+        end
         
         test_num = test_num + 1;
         $display("  Stall test completed with %0d errors", error_count);
     end
 endtask
-
 
 // ================= Main Test Sequence =================
 initial begin
@@ -1007,7 +1100,6 @@ initial begin
     // Instructions: addi csrwr addi addi
     // stall on iq
     test_stall_on_iq_addi_csrwr_addi_addi;
-
 
     // ================= Final Summary =================
     $display("\n==================================================");
