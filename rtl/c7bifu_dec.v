@@ -31,6 +31,8 @@ module c7bifu_dec (
 
    // lsu
    output             ifu_exu_lsu_vld_d,
+   output             ifu_exu_lsu_ibar_d,
+   output             ifu_exu_lsu_dbar_d,
    output [6:0]       ifu_exu_lsu_op_d,
    output             ifu_exu_lsu_double_read_d,
 
@@ -154,6 +156,8 @@ module c7bifu_dec (
 
    // lsu
    assign ifu_exu_lsu_vld_d = lsu_dispatch_d & ifu_exu_vld_d; 
+   assign ifu_exu_lsu_ibar_d = op_d[`LIBAR];
+   assign ifu_exu_lsu_dbar_d = op_d[`LDBAR];
    assign ifu_exu_lsu_op_d = op_d[`LOP_CODE];
    assign ifu_exu_lsu_double_read_d = op_d[`LDOUBLE_READ] & lsu_dispatch_d;
    

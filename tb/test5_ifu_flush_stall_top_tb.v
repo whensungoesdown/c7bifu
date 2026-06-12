@@ -61,6 +61,8 @@ wire [31:0] ifu_exu_alu_c_d;
 wire ifu_exu_alu_double_word_d;
 wire ifu_exu_alu_b_imm_d;
 wire ifu_exu_lsu_vld_d;
+wire ifu_exu_lsu_ibar_d;          // NEW: ibar output
+wire ifu_exu_lsu_dbar_d;          // NEW: dbar output
 wire [6:0] ifu_exu_lsu_op_d;
 wire ifu_exu_lsu_double_read_d;
 wire ifu_exu_bru_vld_d;
@@ -153,6 +155,8 @@ c7bifu uut (
     .ifu_exu_alu_double_word_d(ifu_exu_alu_double_word_d),
     .ifu_exu_alu_b_imm_d(ifu_exu_alu_b_imm_d),
     .ifu_exu_lsu_vld_d(ifu_exu_lsu_vld_d),
+    .ifu_exu_lsu_ibar_d(ifu_exu_lsu_ibar_d),   // NEW
+    .ifu_exu_lsu_dbar_d(ifu_exu_lsu_dbar_d),   // NEW
     .ifu_exu_lsu_op_d(ifu_exu_lsu_op_d),
     .ifu_exu_lsu_double_read_d(ifu_exu_lsu_double_read_d),
     .ifu_exu_bru_vld_d(ifu_exu_bru_vld_d),

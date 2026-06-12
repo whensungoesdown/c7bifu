@@ -53,6 +53,8 @@ module top_tb();
     wire ifu_exu_alu_double_word_d;
     wire ifu_exu_alu_b_imm_d;
     wire ifu_exu_lsu_vld_d;
+    wire ifu_exu_lsu_ibar_d;          // NEW: ibar output
+    wire ifu_exu_lsu_dbar_d;          // NEW: dbar output
     wire [6:0] ifu_exu_lsu_op_d;
     wire ifu_exu_lsu_double_read_d;
     wire ifu_exu_bru_vld_d;
@@ -172,6 +174,8 @@ module top_tb();
         .ifu_exu_alu_b_imm_d(ifu_exu_alu_b_imm_d),
         
         .ifu_exu_lsu_vld_d(ifu_exu_lsu_vld_d),
+        .ifu_exu_lsu_ibar_d(ifu_exu_lsu_ibar_d),   // NEW
+        .ifu_exu_lsu_dbar_d(ifu_exu_lsu_dbar_d),   // NEW
         .ifu_exu_lsu_op_d(ifu_exu_lsu_op_d),
         .ifu_exu_lsu_double_read_d(ifu_exu_lsu_double_read_d),
         
@@ -565,8 +569,6 @@ module top_tb();
     // TEST CASES (unchanged)
     // ================================
     
-    // Test 1: Reset sequence test (commented out as not used)
-    
     // Test 1.5: Normal increment flow with long-cycle ACK, long-cycle dvalid
     task automatic test_normal_increment_flow_long_cycle_ack_long_dvalid;
         reg passed;
@@ -744,10 +746,6 @@ module top_tb();
             print_test_result("Normal Increment Flow - Same-Cycle ACK", passed);
         end
     endtask
-    
-    // Test 4: Mixed ACK modes (commented out as not used)
-    
-    // Test 5: Branch interrupt with same-cycle ACK (commented out)
     
     // Test 6: Exception interrupt without data_cancel
     task automatic test_exception_interrupt_no_datacancel;

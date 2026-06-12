@@ -49,6 +49,8 @@ module c7bifu (
 
    // lsu
    output             ifu_exu_lsu_vld_d,
+   output             ifu_exu_lsu_ibar_d,
+   output             ifu_exu_lsu_dbar_d,
    output [6:0]       ifu_exu_lsu_op_d, // LSU_CODE_BIT 7
    output             ifu_exu_lsu_double_read_d,
 
@@ -259,6 +261,8 @@ module c7bifu (
 
       // lsu
       .ifu_exu_lsu_vld_d               (ifu_exu_lsu_vld_d),
+      .ifu_exu_lsu_ibar_d              (ifu_exu_lsu_ibar_d),
+      .ifu_exu_lsu_dbar_d              (ifu_exu_lsu_dbar_d),
       .ifu_exu_lsu_op_d                (ifu_exu_lsu_op_d),
       .ifu_exu_lsu_double_read_d       (ifu_exu_lsu_double_read_d),
 
@@ -324,11 +328,15 @@ module c7bifu (
       .clk (clk),
       .q   (pf_addr_q));
 
-   dffrle_ns #(1) ic_en_reg (
-      .din (csr_ifu_ic_en),
-      .en  (ic_en_en),
-      .clk (clk),
-      .rst_l (resetn),
-      .q   (ic_en));
+   // uty: test
+   // test icache
+   assign ic_en = 1'b1;
+
+//   dffrle_ns #(1) ic_en_reg (
+//      .din (csr_ifu_ic_en),
+//      .en  (ic_en_en),
+//      .clk (clk),
+//      .rst_l (resetn),
+//      .q   (ic_en));
 
 endmodule
