@@ -330,13 +330,13 @@ module c7bifu (
 
    // uty: test
    // test icache
-   assign ic_en = 1'b1;
+   //assign ic_en = 1'b1;
 
-//   dffrle_ns #(1) ic_en_reg (
-//      .din (csr_ifu_ic_en),
-//      .en  (ic_en_en),
-//      .clk (clk),
-//      .rst_l (resetn),
-//      .q   (ic_en));
+   dffrle_ns #(1) ic_en_reg (
+      .din (csr_ifu_ic_en),
+      .en  (ic_en_en),
+      .clk (clk),
+      .rst_l (resetn),
+      .q   (ic_en));
 
 endmodule
