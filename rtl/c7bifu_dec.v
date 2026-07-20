@@ -250,6 +250,10 @@ module c7bifu_dec (
    // Output valid signal - gated by stall
    // When stall is asserted, do not output valid signal to next pipeline stage
    // This prevents downstream stages from executing stalled instructions
-   assign ifu_exu_vld_d = inst_vld_d && ~stall;
+   //assign ifu_exu_vld_d = inst_vld_d && ~stall;
+   //
+   // BUG FIX: When a flush occurs, inst_vld_reg is reset to 0; hence,
+   // ifu_exu_vld_d should be forced to 0 as well.
+   assign ifu_exu_vld_d = inst_vld_d && ~stall && ~flush;
 
 endmodule
