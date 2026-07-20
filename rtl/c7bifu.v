@@ -86,16 +86,25 @@ module c7bifu (
    // exc
    output             ifu_exu_exc_vld_d,
    output [5:0]       ifu_exu_exc_code_d,
-   output [31:0]      ifu_exu_exc_badv_d
+   output [31:0]      ifu_exu_exc_badv_d,
+
+   input              csr_ifu_crmd_da, 
+   input              csr_ifu_crmd_pg,
+
+   input  [2:0]       csr_ifu_dmw0_pseg,
+   input  [2:0]       csr_ifu_dmw0_vseg,
+
+   input  [2:0]       csr_ifu_dmw1_pseg,
+   input  [2:0]       csr_ifu_dmw1_vseg
 );
 
    wire [63:0] data;
    wire data_vld;
    wire ack;
 
-   wire [31:0] pf_addr_in;
-   wire [31:0] pf_addr_q;
-   wire [31:0] pf_addr_inc;
+   wire [31:0] pf_vaddr_in;
+   wire [31:0] pf_vaddr_q;
+   wire [31:0] pf_vaddr_inc;
 
    // addrs do not need a flush
    wire pf_addr_sel_init;
@@ -133,6 +142,30 @@ module c7bifu (
    
    wire dec_vld_d;
 
+
+   wire da_mode = csr_ifu_crmd_da;
+   wire pg_mode = ~csr_ifu_crmd_da & csr_ifu_crmd_pg;
+
+   wire match_dmw0; 
+   wire match_dmw1; 
+
+   wire tlbr_exception;
+
+   // ---------- TLB search port signals ----------
+   wire        tlb_s_vld;
+   wire [18:0] tlb_s_vppn;     // VPN2 (19 bits)
+   wire        tlb_s_odd_page;
+   wire [ 9:0] tlb_s_asid;
+   wire        tlb_s_found;
+   wire [ 4:0] tlb_s_index;
+   wire [19:0] tlb_s_pfn;      // Physical page number
+   wire        tlb_s_d;
+   wire        tlb_s_v;
+   wire [ 1:0] tlb_s_mat;
+   wire [ 1:0] tlb_s_plv;
+
+   wire tlb_res_vld;
+
    // The stall_dec signal is asserted when exu_ifu_stall is active.
    // Due to a one-cycle read delay in the instruction queue (IQ), the decode
    // stage must predict whether the currently decoded instructions will cause
@@ -145,9 +178,18 @@ module c7bifu (
    assign stall_dec = stall;
    assign stall_iq = stall | ifu_exu_csr_vld_d | ifu_exu_lsu_vld_d | ifu_exu_div_vld_d; 
 
+   // ifu_fcl makes sure that fcl_req is always comes once cycle after tlb_req
+   //wire tlb_req;
    wire fcl_req;
-   assign ifu_icu_req_ic1 = fcl_req & ic_en;
-   assign ifu_biu_rd_req = fcl_req & ~ic_en;
+   //assign ifu_icu_req_ic1 = fcl_req & ic_en;
+   //assign ifu_biu_rd_req = fcl_req & ~ic_en;
+   //assign ifu_icu_req_ic1 = fcl_req & ic_en & (da_mode | (tlb_s_found & tlb_s_v));
+   //assign ifu_biu_rd_req = fcl_req & ~ic_en & (da_mode | (tlb_s_found & tlb_s_v));
+   assign ifu_icu_req_ic1 = fcl_req & ic_en & (da_mode | match_dmw0 | match_dmw1 | (tlb_s_found & tlb_s_v));
+   assign ifu_biu_rd_req  = fcl_req & ~ic_en & (da_mode | match_dmw0 | match_dmw1 | (tlb_s_found & tlb_s_v));
+
+   //assign tlbr_exception = fcl_req & pg_mode & ~tlb_s_found; // uty: test
+   assign tlbr_exception = tlb_res_vld & ~tlb_s_found; // uty: test
 
    //assign ack = ic_en ? icu_ifu_ack_ic1 : biu_ifu_rd_ack;
    assign ack = icu_ifu_ack_ic1 | biu_ifu_rd_ack;
@@ -167,6 +209,7 @@ module c7bifu (
    c7bifu_fcl u_fcl (
       .clk                             (clk),
       .resetn                          (resetn),
+      //.tlb_req                         (tlb_req), //
       .fcl_req                         (fcl_req),
       .ack                             (ack),
       .data_vld                        (data_vld),
@@ -176,7 +219,8 @@ module c7bifu (
       .exu_ifu_stall                   (exu_ifu_stall),
       .csr_ifu_ic_en_pls               (csr_ifu_ic_en_pls),
 
-      .fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2),
+      //.fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2),
+      .fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2 | tlbr_exception),
 
       .pf_addr_sel_init                (pf_addr_sel_init),
       .pf_addr_sel_old                 (pf_addr_sel_old),
@@ -193,21 +237,17 @@ module c7bifu (
       .wait_bus_clr                    (wait_bus_clr)
    );
 
-   assign pf_addr_inc = pf_addr_q + 4'h8;
+   assign pf_vaddr_inc = pf_vaddr_q + 4'h8;
 
-   assign pf_addr_in = {32{pf_addr_sel_init}} & 32'h1c000000     |
-                       {32{pf_addr_sel_old}}  & pf_addr_q        |
-                       {32{pf_addr_sel_inc}}  & pf_addr_inc      |      
-                       {32{pf_addr_sel_brn}}  & exu_ifu_brn_addr |
-                       {32{pf_addr_sel_isr}}  & exu_ifu_isr_addr |
-                       {32{pf_addr_sel_ert}}  & exu_ifu_ert_addr;		      
-   // uty: test
-   //assign ifu_icu_addr_ic1 = pf_addr_in;
-   //assign ifu_icu_addr_ic1 = pf_addr_q;
-   assign ifu_icu_addr_ic1 = pf_addr_q & {32{ic_en}};
-   assign ifu_biu_rd_addr = pf_addr_q & {32{~ic_en}};
-
-   wire [31:0] iq_start_addr = ic_en ? ifu_icu_addr_ic1 : ifu_biu_rd_addr;
+   assign pf_vaddr_in = {32{pf_addr_sel_init}} & 32'h1c000000     |
+                        {32{pf_addr_sel_old}}  & pf_vaddr_q       |
+                        {32{pf_addr_sel_inc}}  & pf_vaddr_inc     |      
+                        {32{pf_addr_sel_brn}}  & exu_ifu_brn_addr |
+                        {32{pf_addr_sel_isr}}  & exu_ifu_isr_addr |
+                        {32{pf_addr_sel_ert}}  & exu_ifu_ert_addr;		      
+   
+   //wire [31:0] iq_start_addr = ic_en ? ifu_icu_addr_ic1 : ifu_biu_rd_addr;
+   wire [31:0] iq_start_addr = pf_vaddr_q;
    wire [31:0] iq_data_addr = {iq_start_addr[31:3], 3'b0};
 
    c7bifu_iq u_iq (
@@ -223,11 +263,110 @@ module c7bifu (
       .start_addr                      (iq_start_addr),
       .stall                           (stall_iq),
       //.flush                           (flush),
-      .flush                           (flush | flush_dly1), // because ifu_icu_addr_ic1 takes pf_addr_q install of pf_addr_in, there is 1 cycle delay, therefore the iq also needs to wait 1 cycel for the correct updated ifu_icu_addr_ic1
+      .flush                           (flush | flush_dly1), // because ifu_icu_addr_ic1 takes pf_vaddr_q install of pf_vaddr_in, there is 1 cycle delay, therefore the iq also needs to wait 1 cycel for the correct updated ifu_icu_addr_ic1
       .iq_full                         (iq_full),
       .inst_addr                       (inst_addr_f),
       .inst                            (inst_f),
       .inst_vld                        (inst_vld_f)
+   );
+
+
+   wire [31:0] pf2_phyaddr; 
+   // uty: test
+   //assign ifu_icu_addr_ic1 = pf_vaddr_q & {32{ic_en}};
+   //assign ifu_biu_rd_addr = pf_vaddr_q & {32{~ic_en}};
+   assign ifu_icu_addr_ic1 = pf2_phyaddr & {32{ic_en}};
+   assign ifu_biu_rd_addr = pf2_phyaddr & {32{~ic_en}};
+
+
+   // ---------- Drive TLB search inputs ----------
+   //assign tlb_s_vld = tlb_req & pg_mode;
+   //assign tlb_s_vld = fcl_req & pg_mode;
+   // TLB lookup valid only in paging mode and not hit by DMW0 or DMW1
+   assign tlb_s_vld = fcl_req & pg_mode & ~(match_dmw0 | match_dmw1);
+   // Extract VPN2 (bits 31:13) and odd_page (bit 12) from virtual address
+   assign tlb_s_vppn = pf_vaddr_q[31:13];
+   assign tlb_s_odd_page = pf_vaddr_q[12];
+   // ASID from CSR (assume csr_asid is 10-bit)
+   //assign s_asid_tlb    = csr_asid;
+   assign tlb_s_asid = 10'b0;
+
+
+   // Physical address generation
+   // - Direct address mode (DA=1, PG=0): clear high 3 bits
+   // - Mapped address mode (DA=0, PG=1):
+   //   - If DMW0 hit, use DMW0 direct mapping
+   //   - Otherwise use TLB translation result
+   assign match_dmw0 = (pf_vaddr_q[31:29] == csr_ifu_dmw0_vseg);
+   assign match_dmw1 = (pf_vaddr_q[31:29] == csr_ifu_dmw1_vseg);
+
+   // ---------- Generate physical address ----------
+   // Physical address = PFN (20 bits) concatenated with page offset (12 bits)
+   // This is valid only when tlb_s_found is 1; otherwise the value is meaningless.
+   //assign pf2_phyaddr = da_mode ? pf_vaddr_q : {tlb_s_pfn, pf_vaddr_q[11:0]};
+   //assign pf2_phyaddr = da_mode ? (pf_vaddr_q & 32'h1FFFFFFF)  // clear high 3-bit
+   //                         : {tlb_s_pfn, pf_vaddr_q[11:0]};
+   // Physical address with DMW0 priority over DMW1
+   assign pf2_phyaddr = da_mode ? (pf_vaddr_q & 32'h1FFFFFFF)  // not affect 0x1c000000
+                                : (match_dmw0 ? {csr_ifu_dmw0_pseg, pf_vaddr_q[28:0]}
+                                : (match_dmw1 ? {csr_ifu_dmw1_pseg, pf_vaddr_q[28:0]}
+                                              : {tlb_s_pfn, pf_vaddr_q[11:0]}));
+
+
+   c7btlb u_itlb(
+      .clk                             (clk),
+      .resetn                          (resetn),
+
+      // search port
+      .s_vld                           (tlb_s_vld),
+      .s_vppn                          (tlb_s_vppn),
+      .s_odd_page                      (tlb_s_odd_page),
+      .s_asid                          (tlb_s_asid),
+      .s_found                         (tlb_s_found),
+      .s_index                         (tlb_s_index),
+      .s_pfn                           (tlb_s_pfn),
+      .s_d                             (tlb_s_d),
+      .s_v                             (tlb_s_v),
+      .s_mat                           (tlb_s_mat),
+      .s_plv                           (tlb_s_plv),
+
+      // write port
+      .we                              (1'b0),
+      .w_index                         (),
+      .w_vppn                          (),
+      .w_asid                          (),
+      .w_g                             (),
+      .w_v0                            (), 
+      .w_d0                            (),
+      .w_mat0                          (),
+      .w_plv0                          (),
+      .w_ppn0                          (),
+      .w_v1                            (),
+      .w_d1                            (),
+      .w_mat1                          (),
+      .w_plv1                          (),
+      .w_ppn1                          (),
+
+      // read port
+      .r_index                         (),
+      .r_vppn                          (),
+      .r_asid                          (),
+      .r_v0                            (),
+      .r_d0                            (),
+      .r_mat0                          (),
+      .r_plv0                          (),
+      .r_ppn0                          (),
+      .r_v1                            (),
+      .r_d1                            (),
+      .r_mat1                          (),
+      .r_plv1                          (),
+      .r_ppn1                          (),
+
+      // invalid port
+      .inv_en                          (),
+      .inv_op                          (),
+      .inv_asid                        (),
+      .inv_vppn                        ()
    );
 
 
@@ -308,10 +447,24 @@ module c7bifu (
    //assign ifu_exu_exc_vld_d = dec_exc_vld_d; // | other front exceptions
    //assign ifu_exu_exc_code_d = dec_exc_code_d;
 
-   assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld;
-   assign ifu_exu_exc_code_d = fet_exc_vld ? `EXC_ADEF: dec_exc_code_d;
+   //assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld;
+   //assign ifu_exu_exc_code_d = fet_exc_vld ? `EXC_ADEF: dec_exc_code_d;
+   //assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld | tlbr_exception;
+   //assign ifu_exu_exc_code_d = tlbr_exception ? `EXC_TLBR :
+   //                         (fet_exc_vld ? `EXC_ADEF : dec_exc_code_d);
+   //assign ifu_exu_exc_badv_d = ic_en ? ifu_icu_addr_ic1 : ifu_biu_rd_addr;
 
-   assign ifu_exu_exc_badv_d = ic_en ? ifu_icu_addr_ic1 : ifu_biu_rd_addr;
+   assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld | tlbr_exception;
+   
+   // priority: dec > fet > tlbr
+   assign ifu_exu_exc_code_d = dec_exc_vld_d ? dec_exc_code_d :
+                               (fet_exc_vld ? `EXC_ADEF :
+                               (tlbr_exception ? `EXC_TLBR : 32'b0));
+  
+   // badv : bad virtual address 
+   assign ifu_exu_exc_badv_d = (tlbr_exception | fet_exc_vld) ?
+                               pf_vaddr_q :
+                               ifu_exu_pc_d;
 
    // this instruction carries the ADEF exception, so, we have to valid it
    // even though this may not be a valid instruction.
@@ -323,10 +476,10 @@ module c7bifu (
    //
 
    dffe_ns #(32) pf_addr_reg (
-      .din (pf_addr_in),
+      .din (pf_vaddr_in),
       .en  (pf_addr_en),
       .clk (clk),
-      .q   (pf_addr_q));
+      .q   (pf_vaddr_q));
 
    // uty: test
    // test icache
@@ -338,5 +491,12 @@ module c7bifu (
       .clk (clk),
       .rst_l (resetn),
       .q   (ic_en));
+
+
+   dffrl_ns #(1) tlb_res_vld_reg (
+      .din (tlb_s_vld),
+      .clk (clk),
+      .rst_l (resetn),
+      .q   (tlb_res_vld));
 
 endmodule

@@ -23,6 +23,13 @@ end
 reg csr_ifu_ic_en;
 reg csr_ifu_ic_en_pls;
 
+reg        csr_ifu_crmd_da;
+reg        csr_ifu_crmd_pg;
+reg [2:0]  csr_ifu_dmw0_pseg;
+reg [2:0]  csr_ifu_dmw0_vseg;
+reg [2:0]  csr_ifu_dmw1_pseg;
+reg [2:0]  csr_ifu_dmw1_vseg;
+
 // Interface to ICU (Instruction Cache Unit)
 wire [31:0]      ifu_icu_addr_ic1;
 wire             ifu_icu_req_ic1;
@@ -168,7 +175,14 @@ c7bifu dut (
     .ifu_exu_ertn_vld_d   (ifu_exu_ertn_vld_d),
     .ifu_exu_exc_vld_d    (ifu_exu_exc_vld_d),
     .ifu_exu_exc_code_d   (ifu_exu_exc_code_d),
-    .ifu_exu_exc_badv_d   (ifu_exu_exc_badv_d)
+    .ifu_exu_exc_badv_d   (ifu_exu_exc_badv_d),
+
+    .csr_ifu_crmd_da      (csr_ifu_crmd_da),
+    .csr_ifu_crmd_pg      (csr_ifu_crmd_pg),
+    .csr_ifu_dmw0_pseg    (csr_ifu_dmw0_pseg),
+    .csr_ifu_dmw0_vseg    (csr_ifu_dmw0_vseg),
+    .csr_ifu_dmw1_pseg    (csr_ifu_dmw1_pseg),
+    .csr_ifu_dmw1_vseg    (csr_ifu_dmw1_vseg)
 );
 
 // ================= Test Variables =================
@@ -192,6 +206,15 @@ task initialize;
         // Initialize CSR interface
         csr_ifu_ic_en = 1'b1;      // Enable I-cache
         csr_ifu_ic_en_pls = 1'b0;
+
+	// *** Set DA=1, PG=0, DMW all zero ***
+        csr_ifu_crmd_da    = 1'b1;
+        csr_ifu_crmd_pg    = 1'b0;
+        csr_ifu_dmw0_pseg  = 3'b111;
+        csr_ifu_dmw0_vseg  = 3'b111;
+        csr_ifu_dmw1_pseg  = 3'b111;
+        csr_ifu_dmw1_vseg  = 3'b111;
+
         
         // Initialize ICU interface
         icu_ifu_ack_ic1 = 1'b0;
@@ -525,7 +548,7 @@ task test_exception_flow;
         // Trigger exception
         $display("  Triggering exception...");
         exu_ifu_except = 1'b1;
-        exu_ifu_isr_addr = 32'h80000000;  // ISR address
+        exu_ifu_isr_addr = 32'h08000000;  // ISR address
         @(posedge clk);
         exu_ifu_except = 1'b0;
         exu_ifu_isr_addr = 32'h0;
@@ -533,7 +556,7 @@ task test_exception_flow;
         @(posedge clk);
 
         // Verify flush occurs and new fetch starts at ISR address
-        wait_for_fetch_request(32'h80000000);
+        wait_for_fetch_request(32'h08000000);
         fetch_request_count = fetch_request_count + 1;
         
         // Assert: Should NOT continue fetching from previous address
@@ -543,7 +566,7 @@ task test_exception_flow;
         end
         
         // Send ICU response for ISR
-        icu_send_data(32'h80000000, {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000});
+        icu_send_data(32'h08000000, {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000});
         
         // Read from IQ and verify we get ISR instructions
         $display("  Reading instructions after exception...");
@@ -594,7 +617,7 @@ task test_branch_flow;
         // Trigger branch
         $display("  Triggering branch...");
         exu_ifu_branch = 1'b1;
-        exu_ifu_brn_addr = 32'h40001000;  // Branch target
+        exu_ifu_brn_addr = 32'h04001000;  // Branch target
         @(posedge clk);
         exu_ifu_branch = 1'b0;
         exu_ifu_brn_addr = 32'h0;
@@ -602,7 +625,7 @@ task test_branch_flow;
         @(posedge clk);
         
         // Verify flush occurs and new fetch starts at branch target
-        wait_for_fetch_request(32'h40001000);
+        wait_for_fetch_request(32'h04001000);
         fetch_request_count = fetch_request_count + 1;
         
         // Assert: Should NOT continue fetching from previous address
@@ -612,7 +635,7 @@ task test_branch_flow;
         end
         
         // Send ICU response for branch target
-        icu_send_data(32'h40001000, {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000});
+        icu_send_data(32'h04001000, {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000});
         
         // Read from IQ
         $display("  Reading instructions after branch...");
@@ -634,7 +657,7 @@ task test_ertn_flow;
         
         // Trigger exception
         exu_ifu_except = 1'b1;
-        exu_ifu_isr_addr = 32'h80000000;
+        exu_ifu_isr_addr = 32'h08000000;
         @(posedge clk);
         exu_ifu_except = 1'b0;
         exu_ifu_isr_addr = 32'h0;
@@ -642,7 +665,7 @@ task test_ertn_flow;
         @(posedge clk);
 
         // Wait for fetch request to ISR
-        wait_for_fetch_request(32'h80000000);
+        wait_for_fetch_request(32'h08000000);
         fetch_request_count = fetch_request_count + 1;
         
         // Send ICU response for ISR
@@ -671,7 +694,7 @@ task test_ertn_flow;
         fetch_request_count = fetch_request_count + 1;
         
         // Assert: Should fetch from return address, not continue from ISR
-        if (ifu_icu_addr_ic1 === 32'h80000008) begin
+        if (ifu_icu_addr_ic1 === 32'h08000008) begin
             $display("  ERROR[Test%0d]: Fetch should return from exception, not continue from ISR", test_num);
             error_count = error_count + 1;
         end
@@ -710,7 +733,7 @@ task test_concurrent_events;
         // While data is pending, trigger exception
         $display("  Triggering exception during pending data...");
         exu_ifu_except = 1'b1;
-        exu_ifu_isr_addr = 32'h90000000;
+        exu_ifu_isr_addr = 32'h09000000;
         @(posedge clk);
         exu_ifu_except = 1'b0;
         exu_ifu_isr_addr = 32'h0;
@@ -724,22 +747,22 @@ task test_concurrent_events;
         @(posedge clk);
 
         // Verify fetch redirects to ISR
-        wait_for_fetch_request(32'h90000000);
+        wait_for_fetch_request(32'h09000000);
         fetch_request_count = fetch_request_count + 1;
         
         // Assert: Should fetch from ISR, not continue previous fetch
-        if (ifu_icu_addr_ic1 !== 32'h90000000) begin
+        if (ifu_icu_addr_ic1 !== 32'h09000000) begin
             $display("  ERROR[Test%0d]: Should fetch from ISR after exception", test_num);
             error_count = error_count + 1;
         end
         
         // Send ISR data
-        icu_send_data(32'h90000000, {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000});
+        icu_send_data(32'h09000000, {ifu_icu_addr_ic1 + 32'hAAA000 + 4, ifu_icu_addr_ic1 + 32'hAAA000});
         
         // Immediately trigger branch
         $display("  Triggering branch immediately after exception...");
         exu_ifu_branch = 1'b1;
-        exu_ifu_brn_addr = 32'h50000000;
+        exu_ifu_brn_addr = 32'h05000000;
         @(posedge clk);
         exu_ifu_branch = 1'b0;
         exu_ifu_brn_addr = 32'h0;
@@ -747,11 +770,11 @@ task test_concurrent_events;
         @(posedge clk);
 
         // Verify fetch redirects to branch target
-        wait_for_fetch_request(32'h50000000);
+        wait_for_fetch_request(32'h05000000);
         fetch_request_count = fetch_request_count + 1;
         
         // Assert: Should fetch from branch target, not continue from ISR
-        if (ifu_icu_addr_ic1 !== 32'h50000000) begin
+        if (ifu_icu_addr_ic1 !== 32'h05000000) begin
             $display("  ERROR[Test%0d]: Should fetch from branch target after branch", test_num);
             error_count = error_count + 1;
         end

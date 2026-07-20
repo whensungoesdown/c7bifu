@@ -15,3 +15,6 @@ ${PROJECT_ROOT}/rtl/c7bifu_imd.v
 ${PROJECT_ROOT}/rtl/decoder.v 
 ${PROJECT_ROOT}/rtl/c7bifu_dec.v 
 ${PROJECT_ROOT}/rtl/c7bifu.v 
+
+-f ${PROJECT_ROOT}/../c7btlb/flist/c7btlb.flist
+

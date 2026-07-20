@@ -14,6 +14,14 @@ reg resetn;
 reg csr_ifu_ic_en;
 reg csr_ifu_ic_en_pls;
 
+// *** NEW: CSR DA/PG and DMW signals ***
+reg        csr_ifu_crmd_da;
+reg        csr_ifu_crmd_pg;
+reg [2:0]  csr_ifu_dmw0_pseg;
+reg [2:0]  csr_ifu_dmw0_vseg;
+reg [2:0]  csr_ifu_dmw1_pseg;
+reg [2:0]  csr_ifu_dmw1_vseg;
+
 // ============================================
 // ICU Interface
 // ============================================
@@ -180,7 +188,15 @@ c7bifu uut (
     .ifu_exu_ertn_vld_d(ifu_exu_ertn_vld_d),
     .ifu_exu_exc_vld_d(ifu_exu_exc_vld_d),
     .ifu_exu_exc_code_d(ifu_exu_exc_code_d),
-    .ifu_exu_exc_badv_d(ifu_exu_exc_badv_d)
+    .ifu_exu_exc_badv_d(ifu_exu_exc_badv_d),
+
+    // *** NEW connections for DA/PG and DMW ***
+    .csr_ifu_crmd_da      (csr_ifu_crmd_da),
+    .csr_ifu_crmd_pg      (csr_ifu_crmd_pg),
+    .csr_ifu_dmw0_pseg    (csr_ifu_dmw0_pseg),
+    .csr_ifu_dmw0_vseg    (csr_ifu_dmw0_vseg),
+    .csr_ifu_dmw1_pseg    (csr_ifu_dmw1_pseg),
+    .csr_ifu_dmw1_vseg    (csr_ifu_dmw1_vseg)
 );
 
 // ============================================
@@ -275,6 +291,15 @@ task init_signals;
 begin
     csr_ifu_ic_en = 1'b1;
     csr_ifu_ic_en_pls = 1'b0;
+    
+    // *** Set DA=1, PG=0, DMW all zero ***
+    csr_ifu_crmd_da    = 1'b1;
+    csr_ifu_crmd_pg    = 1'b0;
+    csr_ifu_dmw0_pseg  = 3'b0;
+    csr_ifu_dmw0_vseg  = 3'b0;
+    csr_ifu_dmw1_pseg  = 3'b0;
+    csr_ifu_dmw1_vseg  = 3'b0;
+    
     icu_ifu_fault_ic2 = 1'b0;
     icu_ifu_fault_code_ic2 = 2'b0;
     biu_ifu_rd_ack = 1'b0;

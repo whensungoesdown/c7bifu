@@ -6,15 +6,24 @@ module top_tb();
     reg clk;
     reg resetn;
     
-    // CSR interface
+    // CSR interface - ICache enable
     reg csr_ifu_ic_en;
     reg csr_ifu_ic_en_pls;
+    
+    // *** NEW: CSR DA/PG and DMW signals ***
+    reg        csr_ifu_crmd_da;
+    reg        csr_ifu_crmd_pg;
+    reg [2:0]  csr_ifu_dmw0_pseg;
+    reg [2:0]  csr_ifu_dmw0_vseg;
+    reg [2:0]  csr_ifu_dmw1_pseg;
+    reg [2:0]  csr_ifu_dmw1_vseg;
     
     // ICU interface
     reg icu_ifu_ack_ic1;
     reg icu_ifu_data_valid_ic2;
     reg icu_ifu_fault_ic2;
     reg [1:0] icu_ifu_fault_code_ic2;
+    reg [63:0] icu_ifu_data_ic2;
     
     // BIU interface
     reg biu_ifu_rd_ack;
@@ -53,8 +62,8 @@ module top_tb();
     wire ifu_exu_alu_double_word_d;
     wire ifu_exu_alu_b_imm_d;
     wire ifu_exu_lsu_vld_d;
-    wire ifu_exu_lsu_ibar_d;          // NEW: ibar output
-    wire ifu_exu_lsu_dbar_d;          // NEW: dbar output
+    wire ifu_exu_lsu_ibar_d;
+    wire ifu_exu_lsu_dbar_d;
     wire [6:0] ifu_exu_lsu_op_d;
     wire ifu_exu_lsu_double_read_d;
     wire ifu_exu_bru_vld_d;
@@ -141,6 +150,7 @@ module top_tb();
         .icu_ifu_data_valid_ic2(icu_ifu_data_valid_ic2),
         .icu_ifu_fault_ic2(icu_ifu_fault_ic2),
         .icu_ifu_fault_code_ic2(icu_ifu_fault_code_ic2),
+	.icu_ifu_data_ic2(icu_ifu_data_ic2),
         
         .ifu_biu_rd_addr(ifu_biu_rd_addr),
         .ifu_biu_rd_req(ifu_biu_rd_req),
@@ -174,8 +184,8 @@ module top_tb();
         .ifu_exu_alu_b_imm_d(ifu_exu_alu_b_imm_d),
         
         .ifu_exu_lsu_vld_d(ifu_exu_lsu_vld_d),
-        .ifu_exu_lsu_ibar_d(ifu_exu_lsu_ibar_d),   // NEW
-        .ifu_exu_lsu_dbar_d(ifu_exu_lsu_dbar_d),   // NEW
+        .ifu_exu_lsu_ibar_d(ifu_exu_lsu_ibar_d),
+        .ifu_exu_lsu_dbar_d(ifu_exu_lsu_dbar_d),
         .ifu_exu_lsu_op_d(ifu_exu_lsu_op_d),
         .ifu_exu_lsu_double_read_d(ifu_exu_lsu_double_read_d),
         
@@ -205,11 +215,19 @@ module top_tb();
         
         .ifu_exu_exc_vld_d(ifu_exu_exc_vld_d),
         .ifu_exu_exc_code_d(ifu_exu_exc_code_d),
-        .ifu_exu_exc_badv_d(ifu_exu_exc_badv_d)
+        .ifu_exu_exc_badv_d(ifu_exu_exc_badv_d),
+        
+        // *** NEW connections ***
+        .csr_ifu_crmd_da(csr_ifu_crmd_da),
+        .csr_ifu_crmd_pg(csr_ifu_crmd_pg),
+        .csr_ifu_dmw0_pseg(csr_ifu_dmw0_pseg),
+        .csr_ifu_dmw0_vseg(csr_ifu_dmw0_vseg),
+        .csr_ifu_dmw1_pseg(csr_ifu_dmw1_pseg),
+        .csr_ifu_dmw1_vseg(csr_ifu_dmw1_vseg)
     );
 
     // Connect to internal signals for monitoring
-    assign pf_addr_q = dut.pf_addr_q;
+    assign pf_addr_q = dut.pf_vaddr_q;
     assign pf_addr_sel_init = dut.pf_addr_sel_init;
     assign pf_addr_sel_old = dut.pf_addr_sel_old;
     assign pf_addr_sel_inc = dut.pf_addr_sel_inc;
@@ -339,6 +357,14 @@ module top_tb();
         // CSR interface
         csr_ifu_ic_en = 1'b1;
         csr_ifu_ic_en_pls = 1'b0;
+        
+        // *** Set DA=1, PG=0, DMW all zero ***
+        csr_ifu_crmd_da    = 1'b1;
+        csr_ifu_crmd_pg    = 1'b0;
+        csr_ifu_dmw0_pseg  = 3'b0;
+        csr_ifu_dmw0_vseg  = 3'b0;
+        csr_ifu_dmw1_pseg  = 3'b0;
+        csr_ifu_dmw1_vseg  = 3'b0;
         
         // ICU interface
         icu_ifu_ack_ic1 = 0;
@@ -542,9 +568,6 @@ module top_tb();
     // Task: Simulate data valid after ACK
     task automatic generate_data_valid;
         begin
-            // 在ACK之后等待1-2个周期，然后给出data valid
-            //wait_cycles(1 + ($random % 2));
-            //@(posedge clk);
             icu_ifu_data_valid_ic2 = 1'b1; // send immediately, simulate icache hit
             @(posedge clk);
             icu_ifu_data_valid_ic2 = 1'b0;
@@ -552,16 +575,15 @@ module top_tb();
         end
     endtask
 
-    // Task: Simulate data valid after ACK
+    // Task: Simulate data valid after ACK with long delay
     task automatic generate_data_valid_longcycle;
         begin
-            // 在ACK之后等待1-2个周期，然后给出data valid
             wait_cycles(1 + ($random % 5));
             @(posedge clk);
-            icu_ifu_data_valid_ic2 = 1'b1; // send immediately, simulate icache hit
+            icu_ifu_data_valid_ic2 = 1'b1;
             @(posedge clk);
             icu_ifu_data_valid_ic2 = 1'b0;
-            $display("Time=%t: Data valid generated", $time);
+            $display("Time=%t: Data valid generated (long delay)", $time);
         end
     endtask
     
