@@ -459,7 +459,7 @@ module c7bifu (
    // priority: dec > fet > tlbr
    assign ifu_exu_exc_code_d = dec_exc_vld_d ? dec_exc_code_d :
                                (fet_exc_vld ? `EXC_ADEF :
-                               (tlbr_exception ? `EXC_TLBR : 32'b0));
+                               (tlbr_exception ? `EXC_TLBR : 6'b0));
   
    // badv : bad virtual address 
    assign ifu_exu_exc_badv_d = (tlbr_exception | fet_exc_vld) ?
