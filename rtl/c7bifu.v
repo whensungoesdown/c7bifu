@@ -83,6 +83,10 @@ module c7bifu (
    // ertn
    output             ifu_exu_ertn_vld_d,
 
+   // tlb
+   output             ifu_exu_tlb_vld_d,
+   output [3:0]       ifu_exu_tlb_op_d, 
+
    // exc
    output             ifu_exu_exc_vld_d,
    output [5:0]       ifu_exu_exc_code_d,
@@ -95,7 +99,33 @@ module c7bifu (
    input  [2:0]       csr_ifu_dmw0_vseg,
 
    input  [2:0]       csr_ifu_dmw1_pseg,
-   input  [2:0]       csr_ifu_dmw1_vseg
+   input  [2:0]       csr_ifu_dmw1_vseg,
+
+   input  [18:0]      csr_itlb_tlbehi_vppn,
+
+   input              csr_itlb_tlbidx_ne,
+   input  [5:0]       csr_itlb_tlbidx_ps,
+   input  [4:0]       csr_itlb_tlbidx_index,
+
+   input  [19:0]      csr_itlb_tlbelo0_ppn,
+   input              csr_itlb_tlbelo0_g,
+   input  [1:0]       csr_itlb_tlbelo0_mat,
+   input  [1:0]       csr_itlb_tlbelo0_plv,
+   input              csr_itlb_tlbelo0_d,
+   input              csr_itlb_tlbelo0_v,
+
+   input  [19:0]      csr_itlb_tlbelo1_ppn,
+   input              csr_itlb_tlbelo1_g,
+   input  [1:0]       csr_itlb_tlbelo1_mat,
+   input  [1:0]       csr_itlb_tlbelo1_plv,
+   input              csr_itlb_tlbelo1_d,
+   input              csr_itlb_tlbelo1_v,
+
+   input              csr_itlb_tlbrefill_ctx, 
+
+   input  [4:0]       exu_itlb_random_index,
+
+   input              csr_itlb_tlbfill_vld_e
 );
 
    wire [63:0] data;
@@ -331,26 +361,31 @@ module c7bifu (
       .s_plv                           (tlb_s_plv),
 
       // write port
-      .we                              (1'b0),
-      .w_index                         (),
-      .w_vppn                          (),
-      .w_asid                          (),
-      .w_g                             (),
-      .w_v0                            (), 
-      .w_d0                            (),
-      .w_mat0                          (),
-      .w_plv0                          (),
-      .w_ppn0                          (),
-      .w_v1                            (),
-      .w_d1                            (),
-      .w_mat1                          (),
-      .w_plv1                          (),
-      .w_ppn1                          (),
+      .we                              (csr_itlb_tlbfill_vld_e),
+      .w_index                         (csr_itlb_tlbfill_vld_e ? exu_itlb_random_index : csr_itlb_tlbidx_index),
+      .w_vppn                          (csr_itlb_tlbehi_vppn),
+      .w_asid                          (10'b0),
+      .w_g                             (csr_itlb_tlbelo0_g & csr_itlb_tlbelo1_g),
+      .w_ps                            (csr_itlb_tlbidx_ps),
+      .w_e                             (csr_itlb_tlbrefill_ctx ? 1'b1 : ~csr_itlb_tlbidx_ne),
+      .w_v0                            (csr_itlb_tlbelo0_v), 
+      .w_d0                            (csr_itlb_tlbelo0_d),
+      .w_mat0                          (csr_itlb_tlbelo0_mat),
+      .w_plv0                          (csr_itlb_tlbelo0_plv),
+      .w_ppn0                          (csr_itlb_tlbelo0_ppn),
+      .w_v1                            (csr_itlb_tlbelo1_v),
+      .w_d1                            (csr_itlb_tlbelo1_d),
+      .w_mat1                          (csr_itlb_tlbelo1_mat),
+      .w_plv1                          (csr_itlb_tlbelo1_plv),
+      .w_ppn1                          (csr_itlb_tlbelo1_ppn),
 
       // read port
       .r_index                         (),
       .r_vppn                          (),
       .r_asid                          (),
+      .r_g                             (),
+      .r_ps                            (),
+      .r_e                             (),
       .r_v0                            (),
       .r_d0                            (),
       .r_mat0                          (),
@@ -433,6 +468,10 @@ module c7bifu (
 
       // ertn
       .ifu_exu_ertn_vld_d              (ifu_exu_ertn_vld_d),
+
+      // tlb
+      .ifu_exu_tlb_vld_d               (ifu_exu_tlb_vld_d),
+      .ifu_exu_tlb_op_d                (ifu_exu_tlb_op_d),
 
       // exc
       .dec_exc_vld_d                   (dec_exc_vld_d),

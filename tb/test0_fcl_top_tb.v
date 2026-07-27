@@ -10,6 +10,8 @@ module top_tb();
     reg exu_ifu_except;
     reg exu_ifu_branch;    // New input: branch signal
     reg exu_ifu_ertn;      // New input: ertn signal
+    reg exu_ifu_stall;     // NEW: stall input
+    reg fetch_except_hold; // NEW: fetch exception hold input
 
     // Output signals
     wire fcl_req;
@@ -23,6 +25,9 @@ module top_tb();
     wire stall;
     wire flush;
     wire iq_full;
+    wire fcl_data_vld;      // NEW: output from DUT
+    wire flush_dly1;        // NEW: output from DUT
+    wire wait_bus_clr;      // NEW: output from DUT
 
     // Test status variables
     reg [7:0] test_passed;
@@ -63,7 +68,9 @@ module top_tb();
         .exu_ifu_except(exu_ifu_except),
         .exu_ifu_branch(exu_ifu_branch),
         .exu_ifu_ertn(exu_ifu_ertn),
-	.csr_ifu_ic_en_pls(1'b0),
+        .exu_ifu_stall(exu_ifu_stall),          // NEW
+        .fetch_except_hold(fetch_except_hold),  // NEW
+        .csr_ifu_ic_en_pls(1'b0),
         .pf_addr_sel_init(pf_addr_sel_init),
         .pf_addr_sel_old(pf_addr_sel_old),
         .pf_addr_sel_inc(pf_addr_sel_inc),
@@ -71,9 +78,12 @@ module top_tb();
         .pf_addr_sel_isr(pf_addr_sel_isr),
         .pf_addr_sel_ert(pf_addr_sel_ert),
         .pf_addr_en(pf_addr_en),
-	.stall(stall),
-	.flush(flush),
-	.iq_full(iq_full)
+        .fcl_data_vld(fcl_data_vld),            // NEW
+        .stall(stall),
+        .flush(flush),
+        .flush_dly1(flush_dly1),                // NEW
+        .wait_bus_clr(wait_bus_clr),            // NEW
+        .iq_full(iq_full)
     );
 
     // Clock generation: period 10ns
@@ -121,6 +131,8 @@ module top_tb();
         exu_ifu_except = 0;
         exu_ifu_branch = 0;
         exu_ifu_ertn = 0;
+        exu_ifu_stall = 0;        // NEW
+        fetch_except_hold = 0;    // NEW
         test_passed = 0;
         test_failed = 0;
         test_num = 0;

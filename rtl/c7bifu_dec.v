@@ -62,9 +62,12 @@ module c7bifu_dec (
    output             ifu_exu_csr_rdtimel_d,
    output             ifu_exu_csr_rdtimeh_d,
 
-
    // ertn
    output             ifu_exu_ertn_vld_d,
+
+   // tlb
+   output             ifu_exu_tlb_vld_d,
+   output [3:0]       ifu_exu_tlb_op_d, 
 
    // exc
    output             dec_exc_vld_d,
@@ -120,6 +123,7 @@ module c7bifu_dec (
    wire div_dispatch_d = op_d[`LDIV_RELATED];
    wire none_dispatch_d = (op_d[`LCSR_RELATED] || op_d[`LTLB_RELATED] || op_d[`LCACHE_RELATED]); // rdtimel rdtimh are csr_related
    wire ertn_dispatch_d = op_d[`LERET];
+   wire tlb_dispatch_d = op_d[`LTLB_RELATED]; 
 
 
    // These control signals are shared by multiple functional modules.
@@ -208,6 +212,9 @@ module c7bifu_dec (
    // ertn
    assign ifu_exu_ertn_vld_d = ertn_dispatch_d & ifu_exu_vld_d;
 
+   // tlb
+   assign ifu_exu_tlb_vld_d = tlb_dispatch_d & ifu_exu_vld_d;
+   assign ifu_exu_tlb_op_d = op_d[`LOP_CODE];
 
    //
    // Registers

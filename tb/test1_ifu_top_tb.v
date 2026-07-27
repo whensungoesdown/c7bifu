@@ -10,13 +10,34 @@ module top_tb();
     reg csr_ifu_ic_en;
     reg csr_ifu_ic_en_pls;
     
-    // *** NEW: CSR DA/PG and DMW signals ***
+    // CSR DA/PG and DMW signals
     reg        csr_ifu_crmd_da;
     reg        csr_ifu_crmd_pg;
     reg [2:0]  csr_ifu_dmw0_pseg;
     reg [2:0]  csr_ifu_dmw0_vseg;
     reg [2:0]  csr_ifu_dmw1_pseg;
     reg [2:0]  csr_ifu_dmw1_vseg;
+    
+    // *** NEW: TLB CSR inputs from EXU ***
+    reg [18:0] csr_itlb_tlbehi_vppn;
+    reg        csr_itlb_tlbidx_ne;
+    reg [5:0]  csr_itlb_tlbidx_ps;
+    reg [4:0]  csr_itlb_tlbidx_index;
+    reg [19:0] csr_itlb_tlbelo0_ppn;
+    reg        csr_itlb_tlbelo0_g;
+    reg [1:0]  csr_itlb_tlbelo0_mat;
+    reg [1:0]  csr_itlb_tlbelo0_plv;
+    reg        csr_itlb_tlbelo0_d;
+    reg        csr_itlb_tlbelo0_v;
+    reg [19:0] csr_itlb_tlbelo1_ppn;
+    reg        csr_itlb_tlbelo1_g;
+    reg [1:0]  csr_itlb_tlbelo1_mat;
+    reg [1:0]  csr_itlb_tlbelo1_plv;
+    reg        csr_itlb_tlbelo1_d;
+    reg        csr_itlb_tlbelo1_v;
+    reg        csr_itlb_tlbrefill_ctx;
+    reg [4:0]  exu_itlb_random_index;
+    reg        csr_itlb_tlbfill_vld_e;
     
     // ICU interface
     reg icu_ifu_ack_ic1;
@@ -85,6 +106,11 @@ module top_tb();
     wire ifu_exu_csr_rdtimel_d;
     wire ifu_exu_csr_rdtimeh_d;
     wire ifu_exu_ertn_vld_d;
+    
+    // *** NEW: TLB output ports from IFU to EXU ***
+    wire ifu_exu_tlb_vld_d;
+    wire [3:0] ifu_exu_tlb_op_d;
+    
     wire ifu_exu_exc_vld_d;
     wire [5:0] ifu_exu_exc_code_d;
     wire [31:0] ifu_exu_exc_badv_d;
@@ -150,7 +176,7 @@ module top_tb();
         .icu_ifu_data_valid_ic2(icu_ifu_data_valid_ic2),
         .icu_ifu_fault_ic2(icu_ifu_fault_ic2),
         .icu_ifu_fault_code_ic2(icu_ifu_fault_code_ic2),
-	.icu_ifu_data_ic2(icu_ifu_data_ic2),
+        .icu_ifu_data_ic2(icu_ifu_data_ic2),
         
         .ifu_biu_rd_addr(ifu_biu_rd_addr),
         .ifu_biu_rd_req(ifu_biu_rd_req),
@@ -213,11 +239,36 @@ module top_tb();
         
         .ifu_exu_ertn_vld_d(ifu_exu_ertn_vld_d),
         
+        // *** NEW: TLB output ports ***
+        .ifu_exu_tlb_vld_d(ifu_exu_tlb_vld_d),
+        .ifu_exu_tlb_op_d(ifu_exu_tlb_op_d),
+        
         .ifu_exu_exc_vld_d(ifu_exu_exc_vld_d),
         .ifu_exu_exc_code_d(ifu_exu_exc_code_d),
         .ifu_exu_exc_badv_d(ifu_exu_exc_badv_d),
         
-        // *** NEW connections ***
+        // *** NEW: TLB CSR inputs from EXU ***
+        .csr_itlb_tlbehi_vppn(csr_itlb_tlbehi_vppn),
+        .csr_itlb_tlbidx_ne(csr_itlb_tlbidx_ne),
+        .csr_itlb_tlbidx_ps(csr_itlb_tlbidx_ps),
+        .csr_itlb_tlbidx_index(csr_itlb_tlbidx_index),
+        .csr_itlb_tlbelo0_ppn(csr_itlb_tlbelo0_ppn),
+        .csr_itlb_tlbelo0_g(csr_itlb_tlbelo0_g),
+        .csr_itlb_tlbelo0_mat(csr_itlb_tlbelo0_mat),
+        .csr_itlb_tlbelo0_plv(csr_itlb_tlbelo0_plv),
+        .csr_itlb_tlbelo0_d(csr_itlb_tlbelo0_d),
+        .csr_itlb_tlbelo0_v(csr_itlb_tlbelo0_v),
+        .csr_itlb_tlbelo1_ppn(csr_itlb_tlbelo1_ppn),
+        .csr_itlb_tlbelo1_g(csr_itlb_tlbelo1_g),
+        .csr_itlb_tlbelo1_mat(csr_itlb_tlbelo1_mat),
+        .csr_itlb_tlbelo1_plv(csr_itlb_tlbelo1_plv),
+        .csr_itlb_tlbelo1_d(csr_itlb_tlbelo1_d),
+        .csr_itlb_tlbelo1_v(csr_itlb_tlbelo1_v),
+        .csr_itlb_tlbrefill_ctx(csr_itlb_tlbrefill_ctx),
+        .exu_itlb_random_index(exu_itlb_random_index),
+        .csr_itlb_tlbfill_vld_e(csr_itlb_tlbfill_vld_e),
+        
+        // CSR DA/PG and DMW
         .csr_ifu_crmd_da(csr_ifu_crmd_da),
         .csr_ifu_crmd_pg(csr_ifu_crmd_pg),
         .csr_ifu_dmw0_pseg(csr_ifu_dmw0_pseg),
@@ -358,13 +409,34 @@ module top_tb();
         csr_ifu_ic_en = 1'b1;
         csr_ifu_ic_en_pls = 1'b0;
         
-        // *** Set DA=1, PG=0, DMW all zero ***
+        // Set DA=1, PG=0, DMW all zero
         csr_ifu_crmd_da    = 1'b1;
         csr_ifu_crmd_pg    = 1'b0;
         csr_ifu_dmw0_pseg  = 3'b0;
         csr_ifu_dmw0_vseg  = 3'b0;
         csr_ifu_dmw1_pseg  = 3'b0;
         csr_ifu_dmw1_vseg  = 3'b0;
+        
+        // *** NEW: Initialize TLB CSR inputs to 0 ***
+        csr_itlb_tlbehi_vppn    = 19'b0;
+        csr_itlb_tlbidx_ne      = 1'b0;
+        csr_itlb_tlbidx_ps      = 6'b0;
+        csr_itlb_tlbidx_index   = 5'b0;
+        csr_itlb_tlbelo0_ppn    = 20'b0;
+        csr_itlb_tlbelo0_g      = 1'b0;
+        csr_itlb_tlbelo0_mat    = 2'b0;
+        csr_itlb_tlbelo0_plv    = 2'b0;
+        csr_itlb_tlbelo0_d      = 1'b0;
+        csr_itlb_tlbelo0_v      = 1'b0;
+        csr_itlb_tlbelo1_ppn    = 20'b0;
+        csr_itlb_tlbelo1_g      = 1'b0;
+        csr_itlb_tlbelo1_mat    = 2'b0;
+        csr_itlb_tlbelo1_plv    = 2'b0;
+        csr_itlb_tlbelo1_d      = 1'b0;
+        csr_itlb_tlbelo1_v      = 1'b0;
+        csr_itlb_tlbrefill_ctx  = 1'b0;
+        exu_itlb_random_index   = 5'b0;
+        csr_itlb_tlbfill_vld_e  = 1'b0;
         
         // ICU interface
         icu_ifu_ack_ic1 = 0;

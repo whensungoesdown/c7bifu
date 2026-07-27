@@ -53,6 +53,17 @@ module top_tb();
     wire        dec_exc_vld_d;
     wire [5:0]  dec_exc_code_d;
     
+    // ---- Additional missing output signals ----
+    wire        ifu_exu_lsu_ibar_d;
+    wire        ifu_exu_lsu_dbar_d;
+    wire        ifu_exu_div_vld_d;
+    wire        ifu_exu_div_signed_d;
+    wire        ifu_exu_div_mod_d;
+    wire        ifu_exu_csr_rdtimel_d;
+    wire        ifu_exu_csr_rdtimeh_d;
+    wire        ifu_exu_tlb_vld_d;
+    wire [3:0]  ifu_exu_tlb_op_d;
+    
     // =============================
     // Statistics Counters
     // =============================
@@ -109,7 +120,18 @@ module top_tb();
         .ifu_exu_csr_waddr_d     (ifu_exu_csr_waddr_d),
         .ifu_exu_ertn_vld_d      (ifu_exu_ertn_vld_d),
         .dec_exc_vld_d           (dec_exc_vld_d),
-        .dec_exc_code_d          (dec_exc_code_d)
+        .dec_exc_code_d          (dec_exc_code_d),
+        
+        // ---- New connections for missing ports ----
+        .ifu_exu_lsu_ibar_d      (ifu_exu_lsu_ibar_d),
+        .ifu_exu_lsu_dbar_d      (ifu_exu_lsu_dbar_d),
+        .ifu_exu_div_vld_d       (ifu_exu_div_vld_d),
+        .ifu_exu_div_signed_d    (ifu_exu_div_signed_d),
+        .ifu_exu_div_mod_d       (ifu_exu_div_mod_d),
+        .ifu_exu_csr_rdtimel_d   (ifu_exu_csr_rdtimel_d),
+        .ifu_exu_csr_rdtimeh_d   (ifu_exu_csr_rdtimeh_d),
+        .ifu_exu_tlb_vld_d       (ifu_exu_tlb_vld_d),
+        .ifu_exu_tlb_op_d        (ifu_exu_tlb_op_d)
     );
     
     // =============================

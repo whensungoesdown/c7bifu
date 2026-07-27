@@ -30,6 +30,27 @@ reg [2:0]  csr_ifu_dmw0_vseg;
 reg [2:0]  csr_ifu_dmw1_pseg;
 reg [2:0]  csr_ifu_dmw1_vseg;
 
+// TLB CSR inputs from EXU (driven by test)
+reg [18:0] csr_itlb_tlbehi_vppn;
+reg        csr_itlb_tlbidx_ne;
+reg [5:0]  csr_itlb_tlbidx_ps;
+reg [4:0]  csr_itlb_tlbidx_index;
+reg [19:0] csr_itlb_tlbelo0_ppn;
+reg        csr_itlb_tlbelo0_g;
+reg [1:0]  csr_itlb_tlbelo0_mat;
+reg [1:0]  csr_itlb_tlbelo0_plv;
+reg        csr_itlb_tlbelo0_d;
+reg        csr_itlb_tlbelo0_v;
+reg [19:0] csr_itlb_tlbelo1_ppn;
+reg        csr_itlb_tlbelo1_g;
+reg [1:0]  csr_itlb_tlbelo1_mat;
+reg [1:0]  csr_itlb_tlbelo1_plv;
+reg        csr_itlb_tlbelo1_d;
+reg        csr_itlb_tlbelo1_v;
+reg        csr_itlb_tlbrefill_ctx;
+reg [4:0]  exu_itlb_random_index;
+reg        csr_itlb_tlbfill_vld_e;
+
 // Interface to ICU (Instruction Cache Unit)
 wire [31:0]      ifu_icu_addr_ic1;
 wire             ifu_icu_req_ic1;
@@ -48,7 +69,7 @@ reg  [63:0]      biu_ifu_data;
 reg              biu_ifu_fault;
 reg  [1:0]       biu_ifu_fault_code;
 
-// Interface to EXU (Execution Unit)
+// Interface to EXU (Execution Unit) - inputs from EXU to IFU
 reg              exu_ifu_except;
 reg  [31:0]      exu_ifu_isr_addr;
 reg              exu_ifu_branch;
@@ -57,7 +78,7 @@ reg              exu_ifu_ertn;
 reg  [31:0]      exu_ifu_ert_addr;
 reg              exu_ifu_stall;
 
-// EXU output signals (from DUT)
+// EXU output signals from IFU to EXU
 wire             ifu_exu_vld_d;
 wire [31:0]      ifu_exu_pc_d;
 wire [4:0]       ifu_exu_rs1_d;
@@ -72,8 +93,8 @@ wire [31:0]      ifu_exu_alu_c_d;
 wire             ifu_exu_alu_double_word_d;
 wire             ifu_exu_alu_b_imm_d;
 wire             ifu_exu_lsu_vld_d;
-wire             ifu_exu_lsu_ibar_d;          // NEW
-wire             ifu_exu_lsu_dbar_d;          // NEW
+wire             ifu_exu_lsu_ibar_d;
+wire             ifu_exu_lsu_dbar_d;
 wire [6:0]       ifu_exu_lsu_op_d;
 wire             ifu_exu_lsu_double_read_d;
 wire             ifu_exu_bru_vld_d;
@@ -95,6 +116,11 @@ wire [13:0]      ifu_exu_csr_waddr_d;
 wire             ifu_exu_csr_rdtimel_d;
 wire             ifu_exu_csr_rdtimeh_d;
 wire             ifu_exu_ertn_vld_d;
+
+// TLB output ports from IFU to EXU
+wire             ifu_exu_tlb_vld_d;
+wire [3:0]       ifu_exu_tlb_op_d;
+
 wire             ifu_exu_exc_vld_d;
 wire [5:0]       ifu_exu_exc_code_d;
 wire [31:0]      ifu_exu_exc_badv_d;
@@ -150,8 +176,8 @@ c7bifu dut (
     .ifu_exu_alu_double_word_d (ifu_exu_alu_double_word_d),
     .ifu_exu_alu_b_imm_d  (ifu_exu_alu_b_imm_d),
     .ifu_exu_lsu_vld_d    (ifu_exu_lsu_vld_d),
-    .ifu_exu_lsu_ibar_d   (ifu_exu_lsu_ibar_d),   // NEW
-    .ifu_exu_lsu_dbar_d   (ifu_exu_lsu_dbar_d),   // NEW
+    .ifu_exu_lsu_ibar_d   (ifu_exu_lsu_ibar_d),
+    .ifu_exu_lsu_dbar_d   (ifu_exu_lsu_dbar_d),
     .ifu_exu_lsu_op_d     (ifu_exu_lsu_op_d),
     .ifu_exu_lsu_double_read_d (ifu_exu_lsu_double_read_d),
     .ifu_exu_bru_vld_d    (ifu_exu_bru_vld_d),
@@ -173,10 +199,37 @@ c7bifu dut (
     .ifu_exu_csr_rdtimel_d (ifu_exu_csr_rdtimel_d),
     .ifu_exu_csr_rdtimeh_d (ifu_exu_csr_rdtimeh_d),
     .ifu_exu_ertn_vld_d   (ifu_exu_ertn_vld_d),
+
+    // TLB output ports to EXU
+    .ifu_exu_tlb_vld_d    (ifu_exu_tlb_vld_d),
+    .ifu_exu_tlb_op_d     (ifu_exu_tlb_op_d),
+
     .ifu_exu_exc_vld_d    (ifu_exu_exc_vld_d),
     .ifu_exu_exc_code_d   (ifu_exu_exc_code_d),
     .ifu_exu_exc_badv_d   (ifu_exu_exc_badv_d),
 
+    // TLB CSR inputs from EXU
+    .csr_itlb_tlbehi_vppn (csr_itlb_tlbehi_vppn),
+    .csr_itlb_tlbidx_ne   (csr_itlb_tlbidx_ne),
+    .csr_itlb_tlbidx_ps   (csr_itlb_tlbidx_ps),
+    .csr_itlb_tlbidx_index(csr_itlb_tlbidx_index),
+    .csr_itlb_tlbelo0_ppn (csr_itlb_tlbelo0_ppn),
+    .csr_itlb_tlbelo0_g   (csr_itlb_tlbelo0_g),
+    .csr_itlb_tlbelo0_mat (csr_itlb_tlbelo0_mat),
+    .csr_itlb_tlbelo0_plv (csr_itlb_tlbelo0_plv),
+    .csr_itlb_tlbelo0_d   (csr_itlb_tlbelo0_d),
+    .csr_itlb_tlbelo0_v   (csr_itlb_tlbelo0_v),
+    .csr_itlb_tlbelo1_ppn (csr_itlb_tlbelo1_ppn),
+    .csr_itlb_tlbelo1_g   (csr_itlb_tlbelo1_g),
+    .csr_itlb_tlbelo1_mat (csr_itlb_tlbelo1_mat),
+    .csr_itlb_tlbelo1_plv (csr_itlb_tlbelo1_plv),
+    .csr_itlb_tlbelo1_d   (csr_itlb_tlbelo1_d),
+    .csr_itlb_tlbelo1_v   (csr_itlb_tlbelo1_v),
+    .csr_itlb_tlbrefill_ctx (csr_itlb_tlbrefill_ctx),
+    .exu_itlb_random_index(exu_itlb_random_index),
+    .csr_itlb_tlbfill_vld_e(csr_itlb_tlbfill_vld_e),
+
+    // CSR DA/PG and DMW
     .csr_ifu_crmd_da      (csr_ifu_crmd_da),
     .csr_ifu_crmd_pg      (csr_ifu_crmd_pg),
     .csr_ifu_dmw0_pseg    (csr_ifu_dmw0_pseg),
@@ -203,11 +256,11 @@ task initialize;
         fetch_request_count = 0;
         icu_response_count = 0;
         
-        // Initialize CSR interface
+        // CSR interface
         csr_ifu_ic_en = 1'b1;      // Enable I-cache
         csr_ifu_ic_en_pls = 1'b0;
 
-	// *** Set DA=1, PG=0, DMW all zero ***
+        // DA=1, PG=0, DMW all ones (meaningful for direct mapping)
         csr_ifu_crmd_da    = 1'b1;
         csr_ifu_crmd_pg    = 1'b0;
         csr_ifu_dmw0_pseg  = 3'b111;
@@ -215,22 +268,42 @@ task initialize;
         csr_ifu_dmw1_pseg  = 3'b111;
         csr_ifu_dmw1_vseg  = 3'b111;
 
+        // Initialize TLB CSR inputs to 0
+        csr_itlb_tlbehi_vppn    = 19'b0;
+        csr_itlb_tlbidx_ne      = 1'b0;
+        csr_itlb_tlbidx_ps      = 6'b0;
+        csr_itlb_tlbidx_index   = 5'b0;
+        csr_itlb_tlbelo0_ppn    = 20'b0;
+        csr_itlb_tlbelo0_g      = 1'b0;
+        csr_itlb_tlbelo0_mat    = 2'b0;
+        csr_itlb_tlbelo0_plv    = 2'b0;
+        csr_itlb_tlbelo0_d      = 1'b0;
+        csr_itlb_tlbelo0_v      = 1'b0;
+        csr_itlb_tlbelo1_ppn    = 20'b0;
+        csr_itlb_tlbelo1_g      = 1'b0;
+        csr_itlb_tlbelo1_mat    = 2'b0;
+        csr_itlb_tlbelo1_plv    = 2'b0;
+        csr_itlb_tlbelo1_d      = 1'b0;
+        csr_itlb_tlbelo1_v      = 1'b0;
+        csr_itlb_tlbrefill_ctx  = 1'b0;
+        exu_itlb_random_index   = 5'b0;
+        csr_itlb_tlbfill_vld_e  = 1'b0;
         
-        // Initialize ICU interface
+        // ICU interface
         icu_ifu_ack_ic1 = 1'b0;
         icu_ifu_data_valid_ic2 = 1'b0;
         icu_ifu_data_ic2 = 64'h0;
         icu_ifu_fault_ic2 = 1'b0;
         icu_ifu_fault_code_ic2 = 2'b0;
         
-        // Initialize BIU interface
+        // BIU interface
         biu_ifu_rd_ack = 1'b0;
         biu_ifu_data_valid = 1'b0;
         biu_ifu_data = 64'h0;
         biu_ifu_fault = 1'b0;
         biu_ifu_fault_code = 2'b0;
         
-        // Initialize EXU interface
+        // EXU interface
         exu_ifu_except = 1'b0;
         exu_ifu_isr_addr = 32'h0;
         exu_ifu_branch = 1'b0;
