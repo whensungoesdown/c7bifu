@@ -18,10 +18,11 @@ module top_tb();
     reg [2:0]  csr_ifu_dmw1_pseg;
     reg [2:0]  csr_ifu_dmw1_vseg;
     
-    // *** NEW: TLB CSR inputs from EXU ***
+    // TLB CSR inputs from EXU
     reg [18:0] csr_itlb_tlbehi_vppn;
     reg        csr_itlb_tlbidx_ne;
     reg [5:0]  csr_itlb_tlbidx_ps;
+    reg        csr_itlb_tlbidx_i_d;
     reg [4:0]  csr_itlb_tlbidx_index;
     reg [19:0] csr_itlb_tlbelo0_ppn;
     reg        csr_itlb_tlbelo0_g;
@@ -36,8 +37,15 @@ module top_tb();
     reg        csr_itlb_tlbelo1_d;
     reg        csr_itlb_tlbelo1_v;
     reg        csr_itlb_tlbrefill_ctx;
+    reg [9:0]  csr_itlb_asid_asid;
     reg [4:0]  exu_itlb_random_index;
-    reg        csr_itlb_tlbfill_vld_e;
+    reg        exu_itlb_tlbfill_vld_e;
+    reg        exu_itlb_tlbwr_vld_e;
+    reg        exu_itlb_tlbsrch_vld_e;
+    reg        exu_itlb_invtlb_vld_e;
+    reg [4:0]  exu_itlb_invtlb_op_e;
+    reg [9:0]  exu_itlb_invtlb_asid_e;
+    reg [18:0] exu_itlb_invtlb_vppn_e;
     
     // ICU interface
     reg icu_ifu_ack_ic1;
@@ -68,7 +76,7 @@ module top_tb();
     wire [31:0] ifu_biu_rd_addr;
     wire ifu_biu_rd_req;
     
-    // EXU output signals (unused in test, but must be connected)
+    // EXU output signals
     wire ifu_exu_vld_d;
     wire [31:0] ifu_exu_pc_d;
     wire [4:0] ifu_exu_rs1_d;
@@ -107,13 +115,32 @@ module top_tb();
     wire ifu_exu_csr_rdtimeh_d;
     wire ifu_exu_ertn_vld_d;
     
-    // *** NEW: TLB output ports from IFU to EXU ***
+    // TLB output ports from IFU to EXU
     wire ifu_exu_tlb_vld_d;
     wire [3:0] ifu_exu_tlb_op_d;
     
     wire ifu_exu_exc_vld_d;
     wire [5:0] ifu_exu_exc_code_d;
+    wire [8:0] ifu_exu_exc_subcode_d;
     wire [31:0] ifu_exu_exc_badv_d;
+    
+    // ITLB CSR output ports (from DUT, not used in test)
+    wire [4:0]  itlb_csr_tlbidx_index;
+    wire [18:0] itlb_csr_tlbehi_vppn;
+    wire        itlb_csr_tlbelo_g;
+    wire [5:0]  itlb_csr_tlbidx_ps;
+    wire        itlb_csr_tlbidx_e;
+    wire        itlb_csr_tlbelo0_v;
+    wire        itlb_csr_tlbelo0_d;
+    wire [1:0]  itlb_csr_tlbelo0_mat;
+    wire [1:0]  itlb_csr_tlbelo0_plv;
+    wire [19:0] itlb_csr_tlbelo0_ppn;
+    wire        itlb_csr_tlbelo1_v;
+    wire        itlb_csr_tlbelo1_d;
+    wire [1:0]  itlb_csr_tlbelo1_mat;
+    wire [1:0]  itlb_csr_tlbelo1_plv;
+    wire [19:0] itlb_csr_tlbelo1_ppn;
+    wire [9:0]  itlb_csr_asid_asid;
     
     // Internal signals for monitoring (from DUT)
     wire [31:0] pf_addr_q;
@@ -160,9 +187,9 @@ module top_tb();
     reg [31:0] next_expected_pc;
     
     // ACK control
-    reg ack_mode;  // 0 = 下一周期ACK, 1 = 同一周期ACK
+    reg ack_mode;  // 0 = next-cycle ACK, 1 = same-cycle ACK
 
-    // Instantiate DUT
+    // Instantiate DUT using named connections
     c7bifu dut (
         .clk(clk),
         .resetn(resetn),
@@ -239,18 +266,18 @@ module top_tb();
         
         .ifu_exu_ertn_vld_d(ifu_exu_ertn_vld_d),
         
-        // *** NEW: TLB output ports ***
         .ifu_exu_tlb_vld_d(ifu_exu_tlb_vld_d),
         .ifu_exu_tlb_op_d(ifu_exu_tlb_op_d),
         
         .ifu_exu_exc_vld_d(ifu_exu_exc_vld_d),
         .ifu_exu_exc_code_d(ifu_exu_exc_code_d),
+        .ifu_exu_exc_subcode_d(ifu_exu_exc_subcode_d),
         .ifu_exu_exc_badv_d(ifu_exu_exc_badv_d),
         
-        // *** NEW: TLB CSR inputs from EXU ***
         .csr_itlb_tlbehi_vppn(csr_itlb_tlbehi_vppn),
         .csr_itlb_tlbidx_ne(csr_itlb_tlbidx_ne),
         .csr_itlb_tlbidx_ps(csr_itlb_tlbidx_ps),
+        .csr_itlb_tlbidx_i_d(csr_itlb_tlbidx_i_d),
         .csr_itlb_tlbidx_index(csr_itlb_tlbidx_index),
         .csr_itlb_tlbelo0_ppn(csr_itlb_tlbelo0_ppn),
         .csr_itlb_tlbelo0_g(csr_itlb_tlbelo0_g),
@@ -265,16 +292,39 @@ module top_tb();
         .csr_itlb_tlbelo1_d(csr_itlb_tlbelo1_d),
         .csr_itlb_tlbelo1_v(csr_itlb_tlbelo1_v),
         .csr_itlb_tlbrefill_ctx(csr_itlb_tlbrefill_ctx),
+        .csr_itlb_asid_asid(csr_itlb_asid_asid),
         .exu_itlb_random_index(exu_itlb_random_index),
-        .csr_itlb_tlbfill_vld_e(csr_itlb_tlbfill_vld_e),
+        .exu_itlb_tlbfill_vld_e(exu_itlb_tlbfill_vld_e),
+        .exu_itlb_tlbwr_vld_e(exu_itlb_tlbwr_vld_e),
+        .exu_itlb_tlbsrch_vld_e(exu_itlb_tlbsrch_vld_e),
+        .exu_itlb_invtlb_vld_e(exu_itlb_invtlb_vld_e),
+        .exu_itlb_invtlb_op_e(exu_itlb_invtlb_op_e),
+        .exu_itlb_invtlb_asid_e(exu_itlb_invtlb_asid_e),
+        .exu_itlb_invtlb_vppn_e(exu_itlb_invtlb_vppn_e),
         
-        // CSR DA/PG and DMW
         .csr_ifu_crmd_da(csr_ifu_crmd_da),
         .csr_ifu_crmd_pg(csr_ifu_crmd_pg),
         .csr_ifu_dmw0_pseg(csr_ifu_dmw0_pseg),
         .csr_ifu_dmw0_vseg(csr_ifu_dmw0_vseg),
         .csr_ifu_dmw1_pseg(csr_ifu_dmw1_pseg),
-        .csr_ifu_dmw1_vseg(csr_ifu_dmw1_vseg)
+        .csr_ifu_dmw1_vseg(csr_ifu_dmw1_vseg),
+        
+        .itlb_csr_tlbidx_index(itlb_csr_tlbidx_index),
+        .itlb_csr_tlbehi_vppn(itlb_csr_tlbehi_vppn),
+        .itlb_csr_tlbelo_g(itlb_csr_tlbelo_g),
+        .itlb_csr_tlbidx_ps(itlb_csr_tlbidx_ps),
+        .itlb_csr_tlbidx_e(itlb_csr_tlbidx_e),
+        .itlb_csr_tlbelo0_v(itlb_csr_tlbelo0_v),
+        .itlb_csr_tlbelo0_d(itlb_csr_tlbelo0_d),
+        .itlb_csr_tlbelo0_mat(itlb_csr_tlbelo0_mat),
+        .itlb_csr_tlbelo0_plv(itlb_csr_tlbelo0_plv),
+        .itlb_csr_tlbelo0_ppn(itlb_csr_tlbelo0_ppn),
+        .itlb_csr_tlbelo1_v(itlb_csr_tlbelo1_v),
+        .itlb_csr_tlbelo1_d(itlb_csr_tlbelo1_d),
+        .itlb_csr_tlbelo1_mat(itlb_csr_tlbelo1_mat),
+        .itlb_csr_tlbelo1_plv(itlb_csr_tlbelo1_plv),
+        .itlb_csr_tlbelo1_ppn(itlb_csr_tlbelo1_ppn),
+        .itlb_csr_asid_asid(itlb_csr_asid_asid)
     );
 
     // Connect to internal signals for monitoring
@@ -381,8 +431,7 @@ module top_tb();
     task automatic generate_ack;
         begin
             if (ack_mode == 1'b1) begin
-                // 同一周期ACK模式
-                // 当看到req为高时，立即在同一周期给出ACK
+                // Same-cycle ACK mode
                 if (ifu_icu_req_ic1 == 1'b1) begin
                     icu_ifu_ack_ic1 = 1'b1;
                     @(posedge clk);
@@ -390,7 +439,7 @@ module top_tb();
                     $display("Time=%t: Same-cycle ACK generated", $time);
                 end
             end else begin
-                // 下一周期ACK模式（默认）
+                // Next-cycle ACK mode (default)
                 @(posedge clk);
                 icu_ifu_ack_ic1 = 1'b1;
                 @(posedge clk);
@@ -417,10 +466,11 @@ module top_tb();
         csr_ifu_dmw1_pseg  = 3'b0;
         csr_ifu_dmw1_vseg  = 3'b0;
         
-        // *** NEW: Initialize TLB CSR inputs to 0 ***
+        // Initialize all TLB CSR inputs to 0
         csr_itlb_tlbehi_vppn    = 19'b0;
         csr_itlb_tlbidx_ne      = 1'b0;
         csr_itlb_tlbidx_ps      = 6'b0;
+        csr_itlb_tlbidx_i_d     = 1'b0;
         csr_itlb_tlbidx_index   = 5'b0;
         csr_itlb_tlbelo0_ppn    = 20'b0;
         csr_itlb_tlbelo0_g      = 1'b0;
@@ -435,8 +485,15 @@ module top_tb();
         csr_itlb_tlbelo1_d      = 1'b0;
         csr_itlb_tlbelo1_v      = 1'b0;
         csr_itlb_tlbrefill_ctx  = 1'b0;
+        csr_itlb_asid_asid      = 10'b0;
         exu_itlb_random_index   = 5'b0;
-        csr_itlb_tlbfill_vld_e  = 1'b0;
+        exu_itlb_tlbfill_vld_e  = 1'b0;
+        exu_itlb_tlbwr_vld_e    = 1'b0;
+        exu_itlb_tlbsrch_vld_e  = 1'b0;
+        exu_itlb_invtlb_vld_e   = 1'b0;
+        exu_itlb_invtlb_op_e    = 5'b0;
+        exu_itlb_invtlb_asid_e  = 10'b0;
+        exu_itlb_invtlb_vppn_e  = 19'b0;
         
         // ICU interface
         icu_ifu_ack_ic1 = 0;
@@ -460,7 +517,7 @@ module top_tb();
         exu_ifu_ert_addr = 32'h0;
         exu_ifu_stall = 0;
         
-        ack_mode = 1'b0;  // 默认下一周期ACK模式
+        ack_mode = 1'b0;  // default next-cycle ACK mode
         
         test_passed = 0;
         test_failed = 0;
@@ -498,12 +555,9 @@ module top_tb();
         repeat(2) @(posedge clk);
 
         // Run test cases
-        
-        // 测试不同ACK模式
         test_normal_increment_flow_long_cycle_ack_long_dvalid();
-        test_normal_increment_flow_next_cycle_ack();  // 下一周期ACK
-        test_normal_increment_flow_same_cycle_ack();  // 同一周期ACK
-        
+        test_normal_increment_flow_next_cycle_ack();
+        test_normal_increment_flow_same_cycle_ack();
 
         test_exception_interrupt_no_datacancel();
         test_exception_interrupt_datacancel();
@@ -640,7 +694,7 @@ module top_tb();
     // Task: Simulate data valid after ACK
     task automatic generate_data_valid;
         begin
-            icu_ifu_data_valid_ic2 = 1'b1; // send immediately, simulate icache hit
+            icu_ifu_data_valid_ic2 = 1'b1;
             @(posedge clk);
             icu_ifu_data_valid_ic2 = 1'b0;
             $display("Time=%t: Data valid generated", $time);
@@ -660,10 +714,10 @@ module top_tb();
     endtask
     
     // ================================
-    // TEST CASES (unchanged)
+    // TEST CASES
     // ================================
     
-    // Test 1.5: Normal increment flow with long-cycle ACK, long-cycle dvalid
+    // Test 1: Normal increment flow with long-cycle ACK and long-cycle data valid
     task automatic test_normal_increment_flow_long_cycle_ack_long_dvalid;
         reg passed;
         integer i;
@@ -671,10 +725,8 @@ module top_tb();
             print_test_start("Normal Increment Flow - Long-Cycle ACK, Long-Cycle dvalid");
             passed = 1'b1;
             
-            // Set ACK mode to next-cycle
             ack_mode = 1'b0;
             
-            // Start from reset state
             resetn = 1'b0;
             wait_cycles(1);
             resetn = 1'b1;
@@ -682,11 +734,9 @@ module top_tb();
             
             expected_pc = 32'h1c000000;
             
-            // Test 3 normal increments with next-cycle ACK
             for (i = 0; i < 3; i = i + 1) begin
                 $display("\n--- Cycle %0d ---", i);
                 
-                // Check current address
                 if (ifu_icu_addr_ic1 !== expected_pc) begin
                     $display("ERROR: Cycle %0d - Expected: 0x%h, Got: 0x%h", 
                             i, expected_pc, ifu_icu_addr_ic1);
@@ -695,20 +745,17 @@ module top_tb();
                     $display("OK: Cycle %0d address correct: 0x%h", i, expected_pc);
                 end
                 
-                wait_cycles(5); // long-cycle to simulate icache refill
+                wait_cycles(5);
                 generate_ack();
                 print_realtime_waveform();
                 
-                // Generate data valid
                 generate_data_valid_longcycle();
                 
-                // PC should increment by 8
                 expected_pc = expected_pc + 32'h8;
                 
                 wait_cycles(1);
             end
             
-            // Final address check
             if (ifu_icu_addr_ic1 !== expected_pc) begin
                 $display("ERROR: Final address - Expected: 0x%h, Got: 0x%h", 
                         expected_pc, ifu_icu_addr_ic1);
@@ -729,10 +776,8 @@ module top_tb();
             print_test_start("Normal Increment Flow - Next-Cycle ACK");
             passed = 1'b1;
             
-            // Set ACK mode to next-cycle
             ack_mode = 1'b0;
             
-            // Start from reset state
             resetn = 1'b0;
             wait_cycles(1);
             resetn = 1'b1;
@@ -740,11 +785,9 @@ module top_tb();
             
             expected_pc = 32'h1c000000;
             
-            // Test 3 normal increments with next-cycle ACK
             for (i = 0; i < 3; i = i + 1) begin
                 $display("\n--- Cycle %0d ---", i);
                 
-                // Check current address
                 if (ifu_icu_addr_ic1 !== expected_pc) begin
                     $display("ERROR: Cycle %0d - Expected: 0x%h, Got: 0x%h", 
                             i, expected_pc, ifu_icu_addr_ic1);
@@ -753,20 +796,16 @@ module top_tb();
                     $display("OK: Cycle %0d address correct: 0x%h", i, expected_pc);
                 end
                 
-                // Generate next-cycle ACK
                 generate_ack();
                 print_realtime_waveform();
                 
-                // Generate data valid
                 generate_data_valid();
                 
-                // PC should increment by 8
                 expected_pc = expected_pc + 32'h8;
                 
                 wait_cycles(1);
             end
             
-            // Final address check
             if (ifu_icu_addr_ic1 !== expected_pc) begin
                 $display("ERROR: Final address - Expected: 0x%h, Got: 0x%h", 
                         expected_pc, ifu_icu_addr_ic1);
@@ -787,10 +826,8 @@ module top_tb();
             print_test_start("Normal Increment Flow - Same-Cycle ACK");
             passed = 1'b1;
             
-            // Set ACK mode to same-cycle
             ack_mode = 1'b1;
             
-            // Start from reset state
             resetn = 1'b0;
             wait_cycles(5);
             #2 resetn = 1'b1;
@@ -798,11 +835,9 @@ module top_tb();
             
             expected_pc = 32'h1c000000;
             
-            // Test 3 normal increments with same-cycle ACK
             for (i = 1; i <= 3; i = i + 1) begin
                 $display("\n--- Cycle %0d ---", i);
                 
-                // Check current address
                 if (ifu_icu_addr_ic1 !== expected_pc) begin
                     $display("ERROR: Cycle %0d - Expected: 0x%h, Got: 0x%h", 
                             i, expected_pc, ifu_icu_addr_ic1);
@@ -811,7 +846,6 @@ module top_tb();
                     $display("OK: Cycle %0d address correct: 0x%h", i, expected_pc);
                 end
                 
-                // Generate same-cycle ACK
                 if (ifu_icu_req_ic1 == 1'b1) begin
                     icu_ifu_ack_ic1 = 1'b1;
                     @(posedge clk);
@@ -819,16 +853,13 @@ module top_tb();
                     $display("Time=%t: Same-cycle ACK applied", $time);
                 end
                 
-                // Generate data valid
                 generate_data_valid();
                 
-                // PC should increment by 8
                 expected_pc = expected_pc + 32'h8;
                 
                 wait_cycles(1);
             end
             
-            // Final address check
             if (ifu_icu_addr_ic1 !== expected_pc) begin
                 $display("ERROR: Final address - Expected: 0x%h, Got: 0x%h", 
                         expected_pc, ifu_icu_addr_ic1);
@@ -841,17 +872,15 @@ module top_tb();
         end
     endtask
     
-    // Test 6: Exception interrupt without data_cancel
+    // Test 4: Exception interrupt without data_cancel
     task automatic test_exception_interrupt_no_datacancel;
         reg passed;
         begin
             print_test_start("Exception Interrupt");
             passed = 1'b1;
             
-            // Set ACK mode to same-cycle
             ack_mode = 1'b1;
             
-            // Start from known state
             resetn = 1'b0;
             wait_cycles(5);
             #2 resetn = 1'b1;
@@ -859,7 +888,6 @@ module top_tb();
             
             expected_pc = 32'h1c000000;
             
-            // Get one normal increment first with same-cycle ACK
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -871,15 +899,13 @@ module top_tb();
             expected_pc = expected_pc + 32'h8;
             wait_cycles(2);
             
-            // Trigger exception
             exu_ifu_except = 1'b1;
-            exu_ifu_isr_addr = 32'h1c000100; // Exception handler
+            exu_ifu_isr_addr = 32'h1c000100;
             
             @(posedge clk);
             @(posedge clk);
             print_realtime_waveform();
             
-            // Check exception address is selected
             if (ifu_icu_addr_ic1 !== 32'h1c000100) begin
                 $display("ERROR: Exception handler address - Expected: 0x1c000100, Got: 0x%h", 
                         ifu_icu_addr_ic1);
@@ -890,7 +916,6 @@ module top_tb();
             
             exu_ifu_except = 1'b0;
             
-            // Give same-cycle ACK for exception handler
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -898,7 +923,6 @@ module top_tb();
                 icu_ifu_ack_ic1 = 1'b0;
             end
             
-            // Simulate data valid for exception handler
             generate_data_valid();
             
             if (fcl_data_vld !== 1'b1) begin
@@ -906,7 +930,6 @@ module top_tb();
                 passed = 1'b0;
             end
             
-            // Next address should be handler + 8
             expected_pc = 32'h1c000100 + 32'h8;
             wait_cycles(2);
             
@@ -922,17 +945,15 @@ module top_tb();
         end
     endtask
     
-    // Test 6.5: Exception interrupt with data_cancel
+    // Test 5: Exception interrupt with data_cancel
     task automatic test_exception_interrupt_datacancel;
         reg passed;
         begin
             print_test_start("Exception Interrupt - data_cancel");
             passed = 1'b1;
             
-            // Set ACK mode to same-cycle
             ack_mode = 1'b1;
             
-            // Start from known state
             resetn = 1'b0;
             wait_cycles(5);
             #2 resetn = 1'b1;
@@ -940,7 +961,6 @@ module top_tb();
             
             expected_pc = 32'h1c000000;
             
-            // Get one normal increment first with same-cycle ACK
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -952,21 +972,19 @@ module top_tb();
             @(posedge clk);
             
             expected_pc = expected_pc + 32'h8;
-            icu_ifu_ack_ic1 = 1'b1; // next ack, same cycle
+            icu_ifu_ack_ic1 = 1'b1;
             @(posedge clk);
             icu_ifu_ack_ic1 = 1'b0;
             
             wait_cycles(2);
             
-            // Trigger exception
             exu_ifu_except = 1'b1;
-            exu_ifu_isr_addr = 32'h1c000100; // Exception handler
+            exu_ifu_isr_addr = 32'h1c000100;
             
             @(posedge clk);
             print_realtime_waveform();
             exu_ifu_except = 1'b0;
             
-            // data_valid for the previous 0x1c000008
             generate_data_valid_longcycle();
             
             if (fcl_data_vld === 1'b1) begin
@@ -974,7 +992,6 @@ module top_tb();
                 passed = 1'b0;
             end
             
-            // Give ACK for the exception request
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -982,7 +999,6 @@ module top_tb();
                 icu_ifu_ack_ic1 = 1'b0;
             end
             
-            // Simulate data valid for exception handler
             generate_data_valid();
             
             if (fcl_data_vld !== 1'b1) begin
@@ -993,7 +1009,6 @@ module top_tb();
                 passed = 1'b1;
             end
             
-            // Next address should be handler + 8
             expected_pc = 32'h1c000100 + 32'h8;
             wait_cycles(2);
             
@@ -1009,17 +1024,15 @@ module top_tb();
         end
     endtask
 
-    // Test 7: Branch without data_cancel
+    // Test 6: Branch without data_cancel
     task automatic test_branch_no_datacancel;
         reg passed;
         begin
             print_test_start("Branch");
             passed = 1'b1;
             
-            // Set ACK mode to same-cycle
             ack_mode = 1'b1;
             
-            // Start from known state
             resetn = 1'b0;
             wait_cycles(5);
             #2 resetn = 1'b1;
@@ -1027,7 +1040,6 @@ module top_tb();
             
             expected_pc = 32'h1c000000;
             
-            // Get one normal increment first with same-cycle ACK
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -1039,15 +1051,13 @@ module top_tb();
             expected_pc = expected_pc + 32'h8;
             wait_cycles(2);
             
-            // Trigger branch
             exu_ifu_branch = 1'b1;
-            exu_ifu_brn_addr = 32'h1c000200; // Branch-to address
+            exu_ifu_brn_addr = 32'h1c000200;
             
             @(posedge clk);
             @(posedge clk);
             print_realtime_waveform();
             
-            // Check branch address is selected
             if (ifu_icu_addr_ic1 !== 32'h1c000200) begin
                 $display("ERROR: Branch address - Expected: 0x1c000200, Got: 0x%h", 
                         ifu_icu_addr_ic1);
@@ -1058,7 +1068,6 @@ module top_tb();
             
             exu_ifu_branch = 1'b0;
             
-            // Give same-cycle ACK for branch address
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -1066,7 +1075,6 @@ module top_tb();
                 icu_ifu_ack_ic1 = 1'b0;
             end
             
-            // Simulate data valid for branch address
             generate_data_valid();
             
             if (fcl_data_vld !== 1'b1) begin
@@ -1074,7 +1082,6 @@ module top_tb();
                 passed = 1'b0;
             end
             
-            // Next address should be handler + 8
             expected_pc = 32'h1c000200 + 32'h8;
             wait_cycles(2);
             
@@ -1090,17 +1097,15 @@ module top_tb();
         end
     endtask
     
-    // Test 7.5: Branch with data_cancel
+    // Test 7: Branch with data_cancel
     task automatic test_branch_datacancel;
         reg passed;
         begin
             print_test_start("Branch - data_cancel");
             passed = 1'b1;
             
-            // Set ACK mode to same-cycle
             ack_mode = 1'b1;
             
-            // Start from known state
             resetn = 1'b0;
             wait_cycles(5);
             #2 resetn = 1'b1;
@@ -1108,7 +1113,6 @@ module top_tb();
             
             expected_pc = 32'h1c000000;
             
-            // Get one normal increment first with same-cycle ACK
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -1120,21 +1124,19 @@ module top_tb();
             @(posedge clk);
             
             expected_pc = expected_pc + 32'h8;
-            icu_ifu_ack_ic1 = 1'b1; // next ack, same cycle
+            icu_ifu_ack_ic1 = 1'b1;
             @(posedge clk);
             icu_ifu_ack_ic1 = 1'b0;
             
             wait_cycles(2);
             
-            // Trigger branch
             exu_ifu_branch = 1'b1;
-            exu_ifu_brn_addr = 32'h1c000200; // Branch address
+            exu_ifu_brn_addr = 32'h1c000200;
             
             @(posedge clk);
             print_realtime_waveform();
             exu_ifu_branch = 1'b0;
             
-            // data_valid for the previous 0x1c000008
             generate_data_valid_longcycle();
             
             if (fcl_data_vld === 1'b1) begin
@@ -1142,7 +1144,6 @@ module top_tb();
                 passed = 1'b0;
             end
             
-            // Give ACK for the branch request
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -1150,7 +1151,6 @@ module top_tb();
                 icu_ifu_ack_ic1 = 1'b0;
             end
             
-            // Simulate data valid for branch fetch data
             generate_data_valid();
             
             if (fcl_data_vld !== 1'b1) begin
@@ -1161,7 +1161,6 @@ module top_tb();
                 passed = 1'b1;
             end
             
-            // Next address should be handler + 8
             expected_pc = 32'h1c000200 + 32'h8;
             wait_cycles(2);
             
@@ -1177,17 +1176,15 @@ module top_tb();
         end
     endtask
 
-    // Test 8: ertn without data_cancel
+    // Test 8: ERTN without data_cancel
     task automatic test_ertn_no_datacancel;
         reg passed;
         begin
-            print_test_start("ertn without data_cancel");
+            print_test_start("ERTN without data_cancel");
             passed = 1'b1;
             
-            // Set ACK mode to same-cycle
             ack_mode = 1'b1;
             
-            // Start from known state
             resetn = 1'b0;
             wait_cycles(5);
             #2 resetn = 1'b1;
@@ -1195,7 +1192,6 @@ module top_tb();
             
             expected_pc = 32'h1c000000;
             
-            // Get one normal increment first with same-cycle ACK
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -1207,26 +1203,23 @@ module top_tb();
             expected_pc = expected_pc + 32'h8;
             wait_cycles(2);
             
-            // Trigger ertn
             exu_ifu_ertn = 1'b1;
-            exu_ifu_ert_addr = 32'h1c000300; // ertn address
+            exu_ifu_ert_addr = 32'h1c000300;
             
             @(posedge clk);
             @(posedge clk);
             print_realtime_waveform();
             
-            // Check ertn address is selected
             if (ifu_icu_addr_ic1 !== 32'h1c000300) begin
-                $display("ERROR: ertn address - Expected: 0x1c000300, Got: 0x%h", 
+                $display("ERROR: ERTN address - Expected: 0x1c000300, Got: 0x%h", 
                         ifu_icu_addr_ic1);
                 passed = 1'b0;
             end else begin
-                $display("OK: ertn address correct: 0x1c000300");
+                $display("OK: ERTN address correct: 0x1c000300");
             end
             
             exu_ifu_ertn = 1'b0;
             
-            // Give same-cycle ACK for ertn address
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -1234,41 +1227,37 @@ module top_tb();
                 icu_ifu_ack_ic1 = 1'b0;
             end
             
-            // Simulate data valid for ertn address
             generate_data_valid();
             
             if (fcl_data_vld !== 1'b1) begin
-                $display("ERROR: fcl_data_vld should be 1 after ertn address data valid");
+                $display("ERROR: fcl_data_vld should be 1 after ERTN address data valid");
                 passed = 1'b0;
             end
             
-            // Next address should be handler + 8
             expected_pc = 32'h1c000300 + 32'h8;
             wait_cycles(2);
             
             if (ifu_icu_addr_ic1 !== expected_pc) begin
-                $display("ERROR: Address after ertn - Expected: 0x%h, Got: 0x%h", 
+                $display("ERROR: Address after ERTN - Expected: 0x%h, Got: 0x%h", 
                         expected_pc, ifu_icu_addr_ic1);
                 passed = 1'b0;
             end else begin
-                $display("OK: Address after ertn correct: 0x%h", expected_pc);
+                $display("OK: Address after ERTN correct: 0x%h", expected_pc);
             end
             
-            print_test_result("Branch - no data_cancel", passed);
+            print_test_result("ERTN - no data_cancel", passed);
         end
     endtask
     
-    // Test 8.5: ertn with data_cancel
+    // Test 9: ERTN with data_cancel
     task automatic test_ertn_datacancel;
         reg passed;
         begin
-            print_test_start("ertn with data_cancel");
+            print_test_start("ERTN with data_cancel");
             passed = 1'b1;
             
-            // Set ACK mode to same-cycle
             ack_mode = 1'b1;
             
-            // Start from known state
             resetn = 1'b0;
             wait_cycles(5);
             #2 resetn = 1'b1;
@@ -1276,7 +1265,6 @@ module top_tb();
             
             expected_pc = 32'h1c000000;
             
-            // Get one normal increment first with same-cycle ACK
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -1288,21 +1276,19 @@ module top_tb();
             @(posedge clk);
             
             expected_pc = expected_pc + 32'h8;
-            icu_ifu_ack_ic1 = 1'b1; // next ack, same cycle
+            icu_ifu_ack_ic1 = 1'b1;
             @(posedge clk);
             icu_ifu_ack_ic1 = 1'b0;
             
             wait_cycles(2);
             
-            // Trigger ertn
             exu_ifu_ertn = 1'b1;
-            exu_ifu_ert_addr = 32'h1c000300; // ertn address
+            exu_ifu_ert_addr = 32'h1c000300;
             
             @(posedge clk);
             print_realtime_waveform();
             exu_ifu_ertn = 1'b0;
             
-            // data_valid for the previous 0x1c000008
             generate_data_valid_longcycle();
             
             if (fcl_data_vld === 1'b1) begin
@@ -1310,7 +1296,6 @@ module top_tb();
                 passed = 1'b0;
             end
             
-            // Give ACK for the ertn request
             wait_cycles(1);
             if (ifu_icu_req_ic1 == 1'b1) begin
                 icu_ifu_ack_ic1 = 1'b1;
@@ -1318,7 +1303,6 @@ module top_tb();
                 icu_ifu_ack_ic1 = 1'b0;
             end
             
-            // Simulate data valid for ertn fetch data
             generate_data_valid();
             
             if (fcl_data_vld !== 1'b1) begin
@@ -1329,19 +1313,18 @@ module top_tb();
                 passed = 1'b1;
             end
             
-            // Next address should be handler + 8
             expected_pc = 32'h1c000300 + 32'h8;
             wait_cycles(2);
             
             if (ifu_icu_addr_ic1 !== expected_pc) begin
-                $display("ERROR: Address after ertn - Expected: 0x%h, Got: 0x%h", 
+                $display("ERROR: Address after ERTN - Expected: 0x%h, Got: 0x%h", 
                         expected_pc, ifu_icu_addr_ic1);
                 passed = 1'b0;
             end else begin
-                $display("OK: Address after ertn correct: 0x%h", expected_pc);
+                $display("OK: Address after ERTN correct: 0x%h", expected_pc);
             end
             
-            print_test_result("ertn with data_cancel", passed);
+            print_test_result("ERTN with data_cancel", passed);
         end
     endtask
 

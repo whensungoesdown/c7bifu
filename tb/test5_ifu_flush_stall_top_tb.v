@@ -26,6 +26,7 @@ reg [2:0]  csr_ifu_dmw1_vseg;
 reg [18:0] csr_itlb_tlbehi_vppn;
 reg        csr_itlb_tlbidx_ne;
 reg [5:0]  csr_itlb_tlbidx_ps;
+reg        csr_itlb_tlbidx_i_d;
 reg [4:0]  csr_itlb_tlbidx_index;
 reg [19:0] csr_itlb_tlbelo0_ppn;
 reg        csr_itlb_tlbelo0_g;
@@ -40,8 +41,15 @@ reg [1:0]  csr_itlb_tlbelo1_plv;
 reg        csr_itlb_tlbelo1_d;
 reg        csr_itlb_tlbelo1_v;
 reg        csr_itlb_tlbrefill_ctx;
+reg [9:0]  csr_itlb_asid_asid;
 reg [4:0]  exu_itlb_random_index;
-reg        csr_itlb_tlbfill_vld_e;
+reg        exu_itlb_tlbfill_vld_e;
+reg        exu_itlb_tlbwr_vld_e;
+reg        exu_itlb_tlbsrch_vld_e;
+reg        exu_itlb_invtlb_vld_e;
+reg [4:0]  exu_itlb_invtlb_op_e;
+reg [9:0]  exu_itlb_invtlb_asid_e;
+reg [18:0] exu_itlb_invtlb_vppn_e;
 
 // ============================================
 // ICU Interface
@@ -120,17 +128,34 @@ wire [3:0] ifu_exu_tlb_op_d;
 
 wire ifu_exu_exc_vld_d;
 wire [5:0] ifu_exu_exc_code_d;
+wire [8:0] ifu_exu_exc_subcode_d;
 wire [31:0] ifu_exu_exc_badv_d;
 
+// ITLB CSR output ports (from DUT to CSR, not used in test)
+wire [4:0]  itlb_csr_tlbidx_index;
+wire [18:0] itlb_csr_tlbehi_vppn;
+wire        itlb_csr_tlbelo_g;
+wire [5:0]  itlb_csr_tlbidx_ps;
+wire        itlb_csr_tlbidx_e;
+wire        itlb_csr_tlbelo0_v;
+wire        itlb_csr_tlbelo0_d;
+wire [1:0]  itlb_csr_tlbelo0_mat;
+wire [1:0]  itlb_csr_tlbelo0_plv;
+wire [19:0] itlb_csr_tlbelo0_ppn;
+wire        itlb_csr_tlbelo1_v;
+wire        itlb_csr_tlbelo1_d;
+wire [1:0]  itlb_csr_tlbelo1_mat;
+wire [1:0]  itlb_csr_tlbelo1_plv;
+wire [19:0] itlb_csr_tlbelo1_ppn;
+wire [9:0]  itlb_csr_asid_asid;
+
 // ============================================
-// Test control
+// Test control variables
 // ============================================
 integer test_count;
 integer pass_count;
 integer fail_count;
 integer cycle_counter;
-
-// Instruction stream tracking
 integer expected_pc;
 integer last_pc;
 integer instruction_count;
@@ -219,6 +244,7 @@ c7bifu uut (
 
     .ifu_exu_exc_vld_d(ifu_exu_exc_vld_d),
     .ifu_exu_exc_code_d(ifu_exu_exc_code_d),
+    .ifu_exu_exc_subcode_d(ifu_exu_exc_subcode_d),
     .ifu_exu_exc_badv_d(ifu_exu_exc_badv_d),
 
     // CSR DA/PG and DMW
@@ -233,6 +259,7 @@ c7bifu uut (
     .csr_itlb_tlbehi_vppn (csr_itlb_tlbehi_vppn),
     .csr_itlb_tlbidx_ne   (csr_itlb_tlbidx_ne),
     .csr_itlb_tlbidx_ps   (csr_itlb_tlbidx_ps),
+    .csr_itlb_tlbidx_i_d  (csr_itlb_tlbidx_i_d),
     .csr_itlb_tlbidx_index(csr_itlb_tlbidx_index),
     .csr_itlb_tlbelo0_ppn (csr_itlb_tlbelo0_ppn),
     .csr_itlb_tlbelo0_g   (csr_itlb_tlbelo0_g),
@@ -247,8 +274,33 @@ c7bifu uut (
     .csr_itlb_tlbelo1_d   (csr_itlb_tlbelo1_d),
     .csr_itlb_tlbelo1_v   (csr_itlb_tlbelo1_v),
     .csr_itlb_tlbrefill_ctx(csr_itlb_tlbrefill_ctx),
+    .csr_itlb_asid_asid   (csr_itlb_asid_asid),
     .exu_itlb_random_index(exu_itlb_random_index),
-    .csr_itlb_tlbfill_vld_e(csr_itlb_tlbfill_vld_e)
+    .exu_itlb_tlbfill_vld_e(exu_itlb_tlbfill_vld_e),
+    .exu_itlb_tlbwr_vld_e (exu_itlb_tlbwr_vld_e),
+    .exu_itlb_tlbsrch_vld_e(exu_itlb_tlbsrch_vld_e),
+    .exu_itlb_invtlb_vld_e(exu_itlb_invtlb_vld_e),
+    .exu_itlb_invtlb_op_e (exu_itlb_invtlb_op_e),
+    .exu_itlb_invtlb_asid_e(exu_itlb_invtlb_asid_e),
+    .exu_itlb_invtlb_vppn_e(exu_itlb_invtlb_vppn_e),
+
+    // ITLB CSR outputs (connected but unused)
+    .itlb_csr_tlbidx_index(itlb_csr_tlbidx_index),
+    .itlb_csr_tlbehi_vppn (itlb_csr_tlbehi_vppn),
+    .itlb_csr_tlbelo_g    (itlb_csr_tlbelo_g),
+    .itlb_csr_tlbidx_ps   (itlb_csr_tlbidx_ps),
+    .itlb_csr_tlbidx_e    (itlb_csr_tlbidx_e),
+    .itlb_csr_tlbelo0_v   (itlb_csr_tlbelo0_v),
+    .itlb_csr_tlbelo0_d   (itlb_csr_tlbelo0_d),
+    .itlb_csr_tlbelo0_mat (itlb_csr_tlbelo0_mat),
+    .itlb_csr_tlbelo0_plv (itlb_csr_tlbelo0_plv),
+    .itlb_csr_tlbelo0_ppn (itlb_csr_tlbelo0_ppn),
+    .itlb_csr_tlbelo1_v   (itlb_csr_tlbelo1_v),
+    .itlb_csr_tlbelo1_d   (itlb_csr_tlbelo1_d),
+    .itlb_csr_tlbelo1_mat (itlb_csr_tlbelo1_mat),
+    .itlb_csr_tlbelo1_plv (itlb_csr_tlbelo1_plv),
+    .itlb_csr_tlbelo1_ppn (itlb_csr_tlbelo1_ppn),
+    .itlb_csr_asid_asid   (itlb_csr_asid_asid)
 );
 
 // ============================================
@@ -356,6 +408,7 @@ begin
     csr_itlb_tlbehi_vppn    = 19'b0;
     csr_itlb_tlbidx_ne      = 1'b0;
     csr_itlb_tlbidx_ps      = 6'b0;
+    csr_itlb_tlbidx_i_d     = 1'b0;
     csr_itlb_tlbidx_index   = 5'b0;
     csr_itlb_tlbelo0_ppn    = 20'b0;
     csr_itlb_tlbelo0_g      = 1'b0;
@@ -370,8 +423,15 @@ begin
     csr_itlb_tlbelo1_d      = 1'b0;
     csr_itlb_tlbelo1_v      = 1'b0;
     csr_itlb_tlbrefill_ctx  = 1'b0;
+    csr_itlb_asid_asid      = 10'b0;
     exu_itlb_random_index   = 5'b0;
-    csr_itlb_tlbfill_vld_e  = 1'b0;
+    exu_itlb_tlbfill_vld_e  = 1'b0;
+    exu_itlb_tlbwr_vld_e    = 1'b0;
+    exu_itlb_tlbsrch_vld_e  = 1'b0;
+    exu_itlb_invtlb_vld_e   = 1'b0;
+    exu_itlb_invtlb_op_e    = 5'b0;
+    exu_itlb_invtlb_asid_e  = 10'b0;
+    exu_itlb_invtlb_vppn_e  = 19'b0;
     
     icu_ifu_fault_ic2 = 1'b0;
     icu_ifu_fault_code_ic2 = 2'b0;
@@ -963,6 +1023,9 @@ initial begin
     pass_count = 0;
     fail_count = 0;
     cycle_counter = 0;
+    expected_pc = 32'h1c000000;
+    last_pc = -1;
+    instruction_count = 0;
     
     $display("\n==========================================");
     $display("Starting c7bifu Stall/Flush Tests");
