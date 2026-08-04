@@ -90,6 +90,7 @@ module c7bifu (
    // exc
    output             ifu_exu_exc_vld_d,
    output [5:0]       ifu_exu_exc_code_d,
+   output [8:0]       ifu_exu_exc_subcode_d,
    output [31:0]      ifu_exu_exc_badv_d,
 
    input              csr_ifu_crmd_da, 
@@ -105,6 +106,7 @@ module c7bifu (
 
    input              csr_itlb_tlbidx_ne,
    input  [5:0]       csr_itlb_tlbidx_ps,
+   input              csr_itlb_tlbidx_i_d,
    input  [4:0]       csr_itlb_tlbidx_index,
 
    input  [19:0]      csr_itlb_tlbelo0_ppn,
@@ -121,11 +123,38 @@ module c7bifu (
    input              csr_itlb_tlbelo1_d,
    input              csr_itlb_tlbelo1_v,
 
+   input  [9:0]       csr_itlb_asid_asid,
+
    input              csr_itlb_tlbrefill_ctx, 
 
    input  [4:0]       exu_itlb_random_index,
 
-   input              csr_itlb_tlbfill_vld_e
+   input              exu_itlb_tlbfill_vld_e,
+   input              exu_itlb_tlbwr_vld_e,
+   input              exu_itlb_tlbsrch_vld_e,
+   input              exu_itlb_invtlb_vld_e,
+
+   input  [4:0]       exu_itlb_invtlb_op_e,
+   input  [9:0]       exu_itlb_invtlb_asid_e,
+   input  [18:0]      exu_itlb_invtlb_vppn_e,
+
+   // itlb to csr
+   output [4:0]       itlb_csr_tlbidx_index,
+   output [18:0]      itlb_csr_tlbehi_vppn,
+   output             itlb_csr_tlbelo_g,
+   output [5:0]       itlb_csr_tlbidx_ps,
+   output             itlb_csr_tlbidx_e,
+   output             itlb_csr_tlbelo0_v,
+   output             itlb_csr_tlbelo0_d,
+   output [1:0]       itlb_csr_tlbelo0_mat,
+   output [1:0]       itlb_csr_tlbelo0_plv,
+   output [19:0]      itlb_csr_tlbelo0_ppn,
+   output             itlb_csr_tlbelo1_v,
+   output             itlb_csr_tlbelo1_d,
+   output [1:0]       itlb_csr_tlbelo1_mat,
+   output [1:0]       itlb_csr_tlbelo1_plv,
+   output [19:0]      itlb_csr_tlbelo1_ppn,
+   output [9:0]       itlb_csr_asid_asid
 );
 
    wire [63:0] data;
@@ -200,13 +229,14 @@ module c7bifu (
    // Due to a one-cycle read delay in the instruction queue (IQ), the decode
    // stage must predict whether the currently decoded instructions will cause
    // a stall once they reach the execution (_e) stage.
-   // To prevent instructions from being lost (dropped), stall_dec is
+   // To prevent instructions from being lost (dropped), stall_iq is
    // preemptively asserted one cycle earlier upon decoding CSR, LSU and DIV
    // instructions.
    // Additional instruction types may be added to this preemptive stall logic
    // in the future.
    assign stall_dec = stall;
-   assign stall_iq = stall | ifu_exu_csr_vld_d | ifu_exu_lsu_vld_d | ifu_exu_div_vld_d; 
+   //assign stall_iq = stall | ifu_exu_csr_vld_d | ifu_exu_lsu_vld_d | ifu_exu_div_vld_d; 
+   assign stall_iq = stall | ifu_exu_csr_vld_d | ifu_exu_lsu_vld_d | ifu_exu_div_vld_d | ifu_exu_tlb_vld_d; 
 
    // ifu_fcl makes sure that fcl_req is always comes once cycle after tlb_req
    //wire tlb_req;
@@ -319,7 +349,7 @@ module c7bifu (
    assign tlb_s_odd_page = pf_vaddr_q[12];
    // ASID from CSR (assume csr_asid is 10-bit)
    //assign s_asid_tlb    = csr_asid;
-   assign tlb_s_asid = 10'b0;
+   assign tlb_s_asid = csr_itlb_asid_asid;
 
 
    // Physical address generation
@@ -343,14 +373,40 @@ module c7bifu (
                                               : {tlb_s_pfn, pf_vaddr_q[11:0]}));
 
 
+   // csr_itlb_tlbidx_i_d    itlb 0, dtlb 1
+   wire itlb_we;
+   assign itlb_we = (exu_itlb_tlbfill_vld_e | exu_itlb_tlbwr_vld_e) & ~csr_itlb_tlbidx_i_d;
+
+   wire [4:0] itlb_w_index;
+   assign itlb_w_index = exu_itlb_tlbfill_vld_e ? exu_itlb_random_index :
+                        (exu_itlb_tlbwr_vld_e   ? csr_itlb_tlbidx_index : 5'b0); 
+
+   assign itlb_csr_tlbidx_index = tlb_s_index;
+
+
+   wire tlbsrch_vld_m;
+   wire tlbidx_e;
+
+   assign itlb_csr_tlbidx_e = tlbsrch_vld_m ? tlb_s_found : tlbidx_e;
+
+   wire itlb_inv_en;
+   assign itlb_inv_en = exu_itlb_invtlb_vld_e & ~csr_itlb_tlbidx_i_d; 
+   //assign itlb_inv_en = exu_itlb_invtlb_vld_e; 
+
+
    c7btlb u_itlb(
       .clk                             (clk),
       .resetn                          (resetn),
 
       // search port
-      .s_vld                           (tlb_s_vld),
-      .s_vppn                          (tlb_s_vppn),
+      // exu_itlb_tlbsrch_vld_e has higher priority than tlb_s_vld
+      // uty: test todo, make tlb instructions stall IFU
+      .s_vld                           (tlb_s_vld | exu_itlb_tlbsrch_vld_e),
+      //.s_vppn                          (({19{tlb_s_vld} & tlb_s_vppn}) | ({19{exu_itlb_tlbsrch_vld_e} & csr_itlb_tlbehi_vppn})),
+      .s_vppn                          (exu_itlb_tlbsrch_vld_e ? csr_itlb_tlbehi_vppn : tlb_s_vppn),
       .s_odd_page                      (tlb_s_odd_page),
+      //.s_asid                          (({10{tlb_s_vld} & tlb_s_asid}) | ({10{exu_itlb_tlbsrch_vld_e} & csr_itlb_asid_asid})),
+      //.s_asid                          (exu_itlb_tlbsrch_vld_e ? csr_itlb_asid_asid : tlb_s_asid),
       .s_asid                          (tlb_s_asid),
       .s_found                         (tlb_s_found),
       .s_index                         (tlb_s_index),
@@ -361,10 +417,10 @@ module c7bifu (
       .s_plv                           (tlb_s_plv),
 
       // write port
-      .we                              (csr_itlb_tlbfill_vld_e),
-      .w_index                         (csr_itlb_tlbfill_vld_e ? exu_itlb_random_index : csr_itlb_tlbidx_index),
+      .we                              (itlb_we),
+      .w_index                         (itlb_w_index),
       .w_vppn                          (csr_itlb_tlbehi_vppn),
-      .w_asid                          (10'b0),
+      .w_asid                          (csr_itlb_asid_asid),
       .w_g                             (csr_itlb_tlbelo0_g & csr_itlb_tlbelo1_g),
       .w_ps                            (csr_itlb_tlbidx_ps),
       .w_e                             (csr_itlb_tlbrefill_ctx ? 1'b1 : ~csr_itlb_tlbidx_ne),
@@ -380,28 +436,29 @@ module c7bifu (
       .w_ppn1                          (csr_itlb_tlbelo1_ppn),
 
       // read port
-      .r_index                         (),
-      .r_vppn                          (),
-      .r_asid                          (),
-      .r_g                             (),
-      .r_ps                            (),
-      .r_e                             (),
-      .r_v0                            (),
-      .r_d0                            (),
-      .r_mat0                          (),
-      .r_plv0                          (),
-      .r_ppn0                          (),
-      .r_v1                            (),
-      .r_d1                            (),
-      .r_mat1                          (),
-      .r_plv1                          (),
-      .r_ppn1                          (),
+      .r_index                         (csr_itlb_tlbidx_index),
+      .r_vppn                          (itlb_csr_tlbehi_vppn),
+      .r_asid                          (itlb_csr_asid_asid),
+      .r_g                             (itlb_csr_tlbelo_g),
+      .r_ps                            (itlb_csr_tlbidx_ps),
+      //.r_e                             (itlb_csr_tlbidx_e),
+      .r_e                             (tlbidx_e),
+      .r_v0                            (itlb_csr_tlbelo0_v),
+      .r_d0                            (itlb_csr_tlbelo0_d),
+      .r_mat0                          (itlb_csr_tlbelo0_mat),
+      .r_plv0                          (itlb_csr_tlbelo0_plv),
+      .r_ppn0                          (itlb_csr_tlbelo0_ppn),
+      .r_v1                            (itlb_csr_tlbelo1_v),
+      .r_d1                            (itlb_csr_tlbelo1_d),
+      .r_mat1                          (itlb_csr_tlbelo1_mat),
+      .r_plv1                          (itlb_csr_tlbelo1_plv),
+      .r_ppn1                          (itlb_csr_tlbelo1_ppn),
 
       // invalid port
-      .inv_en                          (),
-      .inv_op                          (),
-      .inv_asid                        (),
-      .inv_vppn                        ()
+      .inv_en                          (itlb_inv_en),
+      .inv_op                          (exu_itlb_invtlb_op_e),
+      .inv_asid                        (exu_itlb_invtlb_asid_e),
+      .inv_vppn                        (exu_itlb_invtlb_vppn_e)
    );
 
 
@@ -499,7 +556,10 @@ module c7bifu (
    assign ifu_exu_exc_code_d = dec_exc_vld_d ? dec_exc_code_d :
                                (fet_exc_vld ? `EXC_ADEF :
                                (tlbr_exception ? `EXC_TLBR : 6'b0));
-  
+
+   // tlbr_exception subcode: itlb 0, dtlb 1
+   assign ifu_exu_exc_subcode_d = 8'b0;
+
    // badv : bad virtual address 
    assign ifu_exu_exc_badv_d = (tlbr_exception | fet_exc_vld) ?
                                pf_vaddr_q :
@@ -537,5 +597,13 @@ module c7bifu (
       .clk (clk),
       .rst_l (resetn),
       .q   (tlb_res_vld));
+
+
+   // TLB search takes 1 cycle
+   dffrl_ns #(1) tlbsrch_vld_m_reg (
+      .din   (exu_itlb_tlbsrch_vld_e),
+      .rst_l (resetn),
+      .clk   (clk),
+      .q     (tlbsrch_vld_m));
 
 endmodule

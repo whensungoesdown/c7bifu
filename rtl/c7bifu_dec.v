@@ -214,7 +214,8 @@ module c7bifu_dec (
 
    // tlb
    assign ifu_exu_tlb_vld_d = tlb_dispatch_d & ifu_exu_vld_d;
-   assign ifu_exu_tlb_op_d = op_d[`LOP_CODE];
+   //assign ifu_exu_tlb_op_d = op_d[`LOP_CODE];
+   assign ifu_exu_tlb_op_d = op_d[`LTLB_CODE];
 
    //
    // Registers

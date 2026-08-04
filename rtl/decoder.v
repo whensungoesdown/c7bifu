@@ -517,9 +517,11 @@ wire rd_write = op_clo_w || op_clz_w || op_cto_w || op_ctz_w  || op_clo_d  || op
                     op_dbar || op_ibar || op_ldgt_b || op_ldgt_h || op_ldgt_w || op_ldgt_d || op_ldle_b || op_ldle_h || op_ldle_w || op_ldle_d || op_stgt_b || op_stgt_h || 
                     op_stgt_w || op_stgt_d || op_stle_b || op_stle_h || op_stle_w || op_stle_d || //mem
                     op_iocsrrd_b || op_iocsrrd_h || op_iocsrrd_w || op_iocsrrd_w || op_iocsrwr_b || op_iocsrwr_h || op_iocsrwr_w || op_iocsrwr_d || // iocsr
-                    op_fld_d || op_fst_d ||// float
-                    op_invtlb || // to make sure that IS will update lsu_base and lsu_wdata for invtlb
-                    op_cache ; // to make sure that IS will update lsu_base and lsu_offset for cache op
+                    op_fld_d || op_fst_d //||// float
+		    // uty: test
+                    // op_invtlb || // to make sure that IS will update lsu_base and lsu_wdata for invtlb
+                    // op_cache ; // to make sure that IS will update lsu_base and lsu_offset for cache op
+		    ;
 
   wire bru_related = op_beqz || op_bnez || op_bceqz || op_bcnez || op_jiscr0 || op_jiscr1 || op_jirl || op_b || op_bl || op_beq || op_bne || op_blt || op_bge ||
                      op_bltu || op_bgeu;
