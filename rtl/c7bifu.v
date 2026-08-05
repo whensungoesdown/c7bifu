@@ -209,6 +209,7 @@ module c7bifu (
    wire match_dmw1; 
 
    wire tlbr_exception;
+   wire pif_exception;
 
    // ---------- TLB search port signals ----------
    wire        tlb_s_vld;
@@ -251,6 +252,8 @@ module c7bifu (
    //assign tlbr_exception = fcl_req & pg_mode & ~tlb_s_found; // uty: test
    assign tlbr_exception = tlb_res_vld & ~tlb_s_found; // uty: test
 
+   assign pif_exception = tlb_res_vld & tlb_s_found & ~tlb_s_v; 
+
    //assign ack = ic_en ? icu_ifu_ack_ic1 : biu_ifu_rd_ack;
    assign ack = icu_ifu_ack_ic1 | biu_ifu_rd_ack;
    assign data = ic_en ? icu_ifu_data_ic2 : biu_ifu_data;
@@ -280,7 +283,7 @@ module c7bifu (
       .csr_ifu_ic_en_pls               (csr_ifu_ic_en_pls),
 
       //.fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2),
-      .fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2 | tlbr_exception),
+      .fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2 | tlbr_exception | pif_exception),
 
       .pf_addr_sel_init                (pf_addr_sel_init),
       .pf_addr_sel_old                 (pf_addr_sel_old),
@@ -550,18 +553,20 @@ module c7bifu (
    //                         (fet_exc_vld ? `EXC_ADEF : dec_exc_code_d);
    //assign ifu_exu_exc_badv_d = ic_en ? ifu_icu_addr_ic1 : ifu_biu_rd_addr;
 
-   assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld | tlbr_exception;
+   assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld | tlbr_exception | pif_exception;
    
-   // priority: dec > fet > tlbr
-   assign ifu_exu_exc_code_d = dec_exc_vld_d ? dec_exc_code_d :
-                               (fet_exc_vld ? `EXC_ADEF :
-                               (tlbr_exception ? `EXC_TLBR : 6'b0));
+   // priority: dec > fet > tlbr > pif
+   assign ifu_exu_exc_code_d = dec_exc_vld_d ? dec_exc_code_d  :
+                               fet_exc_vld    ? `EXC_ADEF      :
+                               tlbr_exception ? `EXC_TLBR      :
+                               pif_exception  ? `EXC_PIF       :
+                                                6'b0;
 
    // tlbr_exception subcode: itlb 0, dtlb 1
    assign ifu_exu_exc_subcode_d = 8'b0;
 
    // badv : bad virtual address 
-   assign ifu_exu_exc_badv_d = (tlbr_exception | fet_exc_vld) ?
+   assign ifu_exu_exc_badv_d = (tlbr_exception | pif_exception | fet_exc_vld) ?
                                pf_vaddr_q :
                                ifu_exu_pc_d;
 
