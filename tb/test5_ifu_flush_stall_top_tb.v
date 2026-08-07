@@ -42,6 +42,7 @@ reg        csr_itlb_tlbelo1_d;
 reg        csr_itlb_tlbelo1_v;
 reg        csr_itlb_tlbrefill_ctx;
 reg [9:0]  csr_itlb_asid_asid;
+reg [1:0]  csr_itlb_crmd_plv;          // NEW
 reg [4:0]  exu_itlb_random_index;
 reg        exu_itlb_tlbfill_vld_e;
 reg        exu_itlb_tlbwr_vld_e;
@@ -275,6 +276,7 @@ c7bifu uut (
     .csr_itlb_tlbelo1_v   (csr_itlb_tlbelo1_v),
     .csr_itlb_tlbrefill_ctx(csr_itlb_tlbrefill_ctx),
     .csr_itlb_asid_asid   (csr_itlb_asid_asid),
+    .csr_itlb_crmd_plv    (csr_itlb_crmd_plv),          // NEW
     .exu_itlb_random_index(exu_itlb_random_index),
     .exu_itlb_tlbfill_vld_e(exu_itlb_tlbfill_vld_e),
     .exu_itlb_tlbwr_vld_e (exu_itlb_tlbwr_vld_e),
@@ -424,6 +426,7 @@ begin
     csr_itlb_tlbelo1_v      = 1'b0;
     csr_itlb_tlbrefill_ctx  = 1'b0;
     csr_itlb_asid_asid      = 10'b0;
+    csr_itlb_crmd_plv       = 2'b0;          // NEW
     exu_itlb_random_index   = 5'b0;
     exu_itlb_tlbfill_vld_e  = 1'b0;
     exu_itlb_tlbwr_vld_e    = 1'b0;
