@@ -127,6 +127,8 @@ module c7bifu (
 
    input              csr_itlb_tlbrefill_ctx, 
 
+   input  [1:0]       csr_itlb_crmd_plv,
+
    input  [4:0]       exu_itlb_random_index,
 
    input              exu_itlb_tlbfill_vld_e,
@@ -210,6 +212,7 @@ module c7bifu (
 
    wire tlbr_exception;
    wire pif_exception;
+   wire ppi_exception;
 
    // ---------- TLB search port signals ----------
    wire        tlb_s_vld;
@@ -253,6 +256,7 @@ module c7bifu (
    assign tlbr_exception = tlb_res_vld & ~tlb_s_found; // uty: test
 
    assign pif_exception = tlb_res_vld & tlb_s_found & ~tlb_s_v; 
+   assign ppi_exception = tlb_res_vld & tlb_s_found & tlb_s_v & (csr_itlb_crmd_plv > tlb_s_plv);
 
    //assign ack = ic_en ? icu_ifu_ack_ic1 : biu_ifu_rd_ack;
    assign ack = icu_ifu_ack_ic1 | biu_ifu_rd_ack;
@@ -283,7 +287,7 @@ module c7bifu (
       .csr_ifu_ic_en_pls               (csr_ifu_ic_en_pls),
 
       //.fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2),
-      .fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2 | tlbr_exception | pif_exception),
+      .fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2 | tlbr_exception | pif_exception | ppi_exception),
 
       .pf_addr_sel_init                (pf_addr_sel_init),
       .pf_addr_sel_old                 (pf_addr_sel_old),
@@ -553,20 +557,21 @@ module c7bifu (
    //                         (fet_exc_vld ? `EXC_ADEF : dec_exc_code_d);
    //assign ifu_exu_exc_badv_d = ic_en ? ifu_icu_addr_ic1 : ifu_biu_rd_addr;
 
-   assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld | tlbr_exception | pif_exception;
+   assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld | tlbr_exception | pif_exception | ppi_exception;
    
    // priority: dec > fet > tlbr > pif
    assign ifu_exu_exc_code_d = dec_exc_vld_d ? dec_exc_code_d  :
                                fet_exc_vld    ? `EXC_ADEF      :
                                tlbr_exception ? `EXC_TLBR      :
                                pif_exception  ? `EXC_PIF       :
+                               ppi_exception  ? `EXC_PPI       :
                                                 6'b0;
 
    // tlbr_exception subcode: itlb 0, dtlb 1
    assign ifu_exu_exc_subcode_d = 8'b0;
 
    // badv : bad virtual address 
-   assign ifu_exu_exc_badv_d = (tlbr_exception | pif_exception | fet_exc_vld) ?
+   assign ifu_exu_exc_badv_d = (tlbr_exception | pif_exception | ppi_exception | fet_exc_vld) ?
                                pf_vaddr_q :
                                ifu_exu_pc_d;
 
