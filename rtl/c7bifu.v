@@ -572,7 +572,8 @@ module c7bifu (
 
    // badv : bad virtual address 
    assign ifu_exu_exc_badv_d = (tlbr_exception | pif_exception | ppi_exception | fet_exc_vld) ?
-                               pf_vaddr_q :
+                               //pf_vaddr_q :
+			       pf2_phyaddr:
                                ifu_exu_pc_d;
 
    // this instruction carries the ADEF exception, so, we have to valid it
