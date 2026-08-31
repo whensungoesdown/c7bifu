@@ -509,8 +509,10 @@ wire rd_write = op_clo_w || op_clz_w || op_cto_w || op_ctz_w  || op_clo_d  || op
                 op_bltu || op_bgeu; // branch
 
   wire lsu_related =op_ll_w || op_sc_w || op_ll_d || op_sc_d || op_ldptr_w || op_stptr_w || op_ldptr_d || op_stptr_d || op_ld_b || op_ld_h || op_ld_w || op_ld_d || op_st_b || 
-                    op_st_h || op_st_w || op_st_d || op_ld_bu || op_ld_hu || op_ld_wu || op_preld || op_ldx_h || op_ldx_w || op_ldx_d || op_ldx_b || op_stx_b || op_stx_h || op_stx_w || op_stx_d || 
-                    op_ldx_bu || op_ldx_hu || op_ldx_wu || op_preldx || op_amswap_w || op_amswap_d || op_amadd_w || op_amadd_d || op_amand_w || op_amand_d || op_amor_w ||
+                    //op_st_h || op_st_w || op_st_d || op_ld_bu || op_ld_hu || op_ld_wu || op_preld || op_ldx_h || op_ldx_w || op_ldx_d || op_ldx_b || op_stx_b || op_stx_h || op_stx_w || op_stx_d || 
+                    op_st_h || op_st_w || op_st_d || op_ld_bu || op_ld_hu || op_ld_wu              || op_ldx_h || op_ldx_w || op_ldx_d || op_ldx_b || op_stx_b || op_stx_h || op_stx_w || op_stx_d || 
+                    //op_ldx_bu || op_ldx_hu || op_ldx_wu || op_preldx || op_amswap_w || op_amswap_d || op_amadd_w || op_amadd_d || op_amand_w || op_amand_d || op_amor_w ||
+                    op_ldx_bu || op_ldx_hu || op_ldx_wu                 || op_amswap_w || op_amswap_d || op_amadd_w || op_amadd_d || op_amand_w || op_amand_d || op_amor_w ||
                     op_amor_d || op_amxor_w || op_amxor_d || op_ammax_w || op_ammax_d || op_ammin_w || op_ammin_d || op_ammax_wu || op_ammax_du || op_ammin_wu || op_ammin_du || 
                     op_amswap_db_w || op_amswap_db_d || op_amadd_db_w || op_amadd_db_d || op_amand_db_w || op_amand_db_d || op_amor_db_w || op_amor_db_d || op_amxor_db_w || 
                     op_amxor_db_d || op_ammax_db_w || op_ammax_db_d || op_ammin_db_w || op_ammin_db_d || op_ammax_db_wu || op_ammax_db_du || op_ammin_db_wu || op_ammin_db_du || 
