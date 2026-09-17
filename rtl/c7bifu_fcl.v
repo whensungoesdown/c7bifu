@@ -206,7 +206,12 @@ module c7bifu_fcl (
    //assign pf_addr_en = ~stall_pf | flush;
    //wire data_vld = stall_pf ? fcl_data_vld : 1'b0;
    //assign pf_addr_en = ~stall_pf | fcl_data_vld | flush;
-   assign pf_addr_en = pf_addr_sel_init | fcl_data_vld | flush;
+   //assign pf_addr_en = pf_addr_sel_init | fcl_data_vld | flush;
+   //
+   // Here is where the stall could cancel the coming fcl_data_vld
+   // iq_full is stall_iq
+   //assign pf_addr_en = pf_addr_sel_init | (fcl_data_vld & ~stall) | flush;
+   assign pf_addr_en = pf_addr_sel_init | (fcl_data_vld & ~iq_full) | flush;
 
 
    //
@@ -257,9 +262,10 @@ module c7bifu_fcl (
       .en (data_cancel_en),
       .q   (data_cancel_q));
 
-   dff_ns #(1) flush_dly1_reg (
+   dffrl_ns #(1) flush_dly1_reg (
       .din (flush),
       .clk (clk),
+      .rst_l (resetn),
       .q   (flush_dly1));
 
 endmodule

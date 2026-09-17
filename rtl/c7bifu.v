@@ -300,11 +300,13 @@ module c7bifu (
       .stall                           (stall),
       .flush                           (flush),
       .flush_dly1                      (flush_dly1),
-      .iq_full                         (iq_full),
+      //.iq_full                         (iq_full),
+      .iq_full                         (stall_iq),
       .wait_bus_clr                    (wait_bus_clr)
    );
 
-   assign pf_vaddr_inc = pf_vaddr_q + 4'h8;
+   //assign pf_vaddr_inc = pf_vaddr_q + 4'h8;
+   assign pf_vaddr_inc = pf_vaddr_q + 4'h4;
 
    assign pf_vaddr_in = {32{pf_addr_sel_init}} & 32'h1c000000     |
                         {32{pf_addr_sel_old}}  & pf_vaddr_q       |
@@ -313,29 +315,64 @@ module c7bifu (
                         {32{pf_addr_sel_isr}}  & exu_ifu_isr_addr |
                         {32{pf_addr_sel_ert}}  & exu_ifu_ert_addr;		      
    
-   //wire [31:0] iq_start_addr = ic_en ? ifu_icu_addr_ic1 : ifu_biu_rd_addr;
-   wire [31:0] iq_start_addr = pf_vaddr_q;
-   wire [31:0] iq_data_addr = {iq_start_addr[31:3], 3'b0};
-
-   c7bifu_iq u_iq (
-      .clk                             (clk),
-      .resetn                          (resetn),
-      //.data_addr                       ({ifu_icu_addr_ic1[31:3], 3'b0}),
-      .data_addr                       (iq_data_addr),
-      //.data                            (icu_ifu_data_ic2),
-      .data                            (data),
-      //.data_vld                        (icu_data_vld),
-      .data_vld                        (fcl_data_vld),
-      //.start_addr                      (ifu_icu_addr_ic1),
-      .start_addr                      (iq_start_addr),
-      .stall                           (stall_iq),
-      //.flush                           (flush),
-      .flush                           (flush | flush_dly1), // because ifu_icu_addr_ic1 takes pf_vaddr_q install of pf_vaddr_in, there is 1 cycle delay, therefore the iq also needs to wait 1 cycel for the correct updated ifu_icu_addr_ic1
-      .iq_full                         (iq_full),
-      .inst_addr                       (inst_addr_f),
-      .inst                            (inst_f),
-      .inst_vld                        (inst_vld_f)
+   if_regs u_if_regs (
+      .clk          (clk),
+      .resetn       (resetn),
+      .pf_vaddr_q   (pf_vaddr_q),
+      .ack          (ack),
+      .data         (data),
+      .fcl_data_vld (fcl_data_vld),
+      //.stall        (stall_iq),
+      .stall        (1'b0),
+      //.flush        (flush | flush_dly1),
+      .flush        (flush),
+      .inst_addr_f  (inst_addr_f),
+      .inst_f       (inst_f),
+      .inst_vld_f   (inst_vld_f)
    );
+
+   //wire [31:0] iq_start_addr = ic_en ? ifu_icu_addr_ic1 : ifu_biu_rd_addr;
+//   wire [31:0] iq_start_addr = pf_vaddr_q;
+//   wire [31:0] iq_data_addr = {iq_start_addr[31:3], 3'b0};
+//
+//   wire [31:0] iq_data_addr_q;
+//   dffe_ns #(32) iq_data_addr_reg (
+//      .din (iq_data_addr),
+//      //.en  (fcl_req),
+//      .en  (ack),
+//      .clk (clk),
+//      .q   (iq_data_addr_q));
+//
+//   wire iq_skip_first_half;
+//   dffe_ns #(1) iq_skip_first_half_reg (
+//      .din (iq_start_addr[2]),
+//      //.en  (fcl_req),
+//      .en  (ack),
+//      .clk (flush | flush_dly1),
+//      .q   (iq_skip_first_half));
+//
+//
+//   c7bifu_iq u_iq (
+//      .clk                             (clk),
+//      .resetn                          (resetn),
+//      //.data_addr                       ({ifu_icu_addr_ic1[31:3], 3'b0}),
+//      //.data_addr                       (iq_data_addr),
+//      .data_addr                       (iq_data_addr_q),
+//      //.data                            (icu_ifu_data_ic2),
+//      .data                            (data),
+//      //.data_vld                        (icu_data_vld),
+//      .data_vld                        (fcl_data_vld),
+//      //.start_addr                      (ifu_icu_addr_ic1),
+//      //.start_addr                      (iq_start_addr),
+//      .skip_first_half                 (iq_skip_first_half),
+//      .stall                           (stall_iq),
+//      //.flush                           (flush),
+//      .flush                           (flush | flush_dly1), // because ifu_icu_addr_ic1 takes pf_vaddr_q install of pf_vaddr_in, there is 1 cycle delay, therefore the iq also needs to wait 1 cycel for the correct updated ifu_icu_addr_ic1
+//      .iq_full                         (iq_full),
+//      .inst_addr                       (inst_addr_f),
+//      .inst                            (inst_f),
+//      .inst_vld                        (inst_vld_f)
+//   );
 
 
    wire [31:0] pf2_phyaddr; 
@@ -615,5 +652,83 @@ module c7bifu (
       .rst_l (resetn),
       .clk   (clk),
       .q     (tlbsrch_vld_m));
+
+endmodule
+
+module if_regs #(
+   parameter ADDR_WIDTH = 32,
+   parameter DATA_WIDTH = 64
+) (
+   input  wire                    clk,
+   input  wire                    resetn,          // Active-low reset, optional
+
+   // Input side
+   input  wire [ADDR_WIDTH-1:0]   pf_vaddr_q,     // Fetch virtual address
+   input  wire                    ack,            // Address handshake valid
+   input  wire [DATA_WIDTH-1:0]   data,           // Fetched instruction data
+   input  wire                    fcl_data_vld,       // Fetched data valid
+
+   // Control
+   input  wire                    stall,          // Active-high: hold current register values
+   input  wire                    flush,          // Active-high: flush current instruction
+
+   // Output side
+   output wire [ADDR_WIDTH-1:0]   inst_addr_f,
+   output wire [31:0]             inst_f,         // Selected 32-bit instruction
+   output wire                    inst_vld_f      // Valid only when stall = 0
+);
+
+   wire stall_f = stall;
+   wire flush_f = flush;
+
+   // ------------------------------------------------------------------
+   // Fetch address register: hold on stall; clear on flush
+   // ------------------------------------------------------------------
+   wire [ADDR_WIDTH-1:0] inst_vaddr_d  = flush_f ? {ADDR_WIDTH{1'b0}} : pf_vaddr_q;
+   wire                  inst_vaddr_en = flush_f | ack; // (ack & ~stall_f);
+
+   dffrle_ns #(ADDR_WIDTH) inst_vaddr_reg (
+      .din (inst_vaddr_d),
+      .en  (inst_vaddr_en),
+      .clk (clk),
+      .rst_l (resetn),
+      .q   (inst_addr_f)
+   );
+
+   // ------------------------------------------------------------------
+   // Fetch data register: hold on stall; clear on flush
+   // ------------------------------------------------------------------
+   wire [DATA_WIDTH-1:0] inst_data;
+   wire [DATA_WIDTH-1:0] inst_data_d  = flush_f ? {DATA_WIDTH{1'b0}} : data;
+   wire                  inst_data_en = flush_f | fcl_data_vld; //(data_vld & ~stall_f);
+
+   dffrle_ns #(DATA_WIDTH) inst_data_reg (
+      .din (inst_data_d),
+      .en  (inst_data_en),
+      .clk (clk),
+      .rst_l (resetn),
+      .q   (inst_data)
+   );
+
+   assign inst_f = inst_addr_f[2] ? inst_data[63:32] : inst_data[31:0];
+
+   // ------------------------------------------------------------------
+   // Valid bit register: hold on stall; clear on flush
+   // The register keeps its value while stall = 1,
+   // but the output is gated so no valid instruction is issued during stall.
+   // ------------------------------------------------------------------
+   wire inst_vld_q;
+   wire inst_vld_d  = flush_f ? 1'b0 : fcl_data_vld;
+   wire inst_vld_en = flush_f | fcl_data_vld | ~stall_f;
+
+   dffrl_ns #(1) inst_vld_reg (
+      .din (inst_vld_d),
+      //.en  (inst_vld_en),
+      .clk (clk),
+      .rst_l (resetn),
+      .q   (inst_vld_q)
+   );
+
+   assign inst_vld_f = inst_vld_q & ~stall_f;
 
 endmodule
