@@ -249,14 +249,14 @@ module c7bifu (
    //assign ifu_biu_rd_req = fcl_req & ~ic_en;
    //assign ifu_icu_req_ic1 = fcl_req & ic_en & (da_mode | (tlb_s_found & tlb_s_v));
    //assign ifu_biu_rd_req = fcl_req & ~ic_en & (da_mode | (tlb_s_found & tlb_s_v));
-   assign ifu_icu_req_ic1 = fcl_req & ic_en & (da_mode | match_dmw0 | match_dmw1 | (tlb_s_found & tlb_s_v));
-   assign ifu_biu_rd_req  = fcl_req & ~ic_en & (da_mode | match_dmw0 | match_dmw1 | (tlb_s_found & tlb_s_v));
+   assign ifu_icu_req_ic1 = fcl_req & ic_en & (da_mode | match_dmw0 | match_dmw1 | (~flush_dly1 & tlb_s_found & tlb_s_v));
+   assign ifu_biu_rd_req  = fcl_req & ~ic_en & (da_mode | match_dmw0 | match_dmw1 | (~flush_dly1 & tlb_s_found & tlb_s_v));
 
    //assign tlbr_exception = fcl_req & pg_mode & ~tlb_s_found; // uty: test
-   assign tlbr_exception = tlb_res_vld & ~tlb_s_found; // uty: test
+   assign tlbr_exception = tlb_res_vld & ~flush_dly1 & ~tlb_s_found; // uty: test
 
-   assign pif_exception = tlb_res_vld & tlb_s_found & ~tlb_s_v; 
-   assign ppi_exception = tlb_res_vld & tlb_s_found & tlb_s_v & (csr_itlb_crmd_plv > tlb_s_plv);
+   assign pif_exception = tlb_res_vld & ~flush_dly1 & tlb_s_found & ~tlb_s_v; 
+   assign ppi_exception = tlb_res_vld & ~flush_dly1 & tlb_s_found & tlb_s_v & (csr_itlb_crmd_plv > tlb_s_plv);
 
    //assign ack = ic_en ? icu_ifu_ack_ic1 : biu_ifu_rd_ack;
    assign ack = icu_ifu_ack_ic1 | biu_ifu_rd_ack;
