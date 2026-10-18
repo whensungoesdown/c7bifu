@@ -10,6 +10,8 @@ module c7bifu_dec (
    input              inst_vld_f,
    input  [31:0]      inst_addr_f,
    input  [31:0]      inst_f,
+   input              inst_exc_f,      // fetch exception entry, inst_addr_f is the faulting address
+   input  [5:0]       inst_exc_code_f,
 
    output             ifu_exu_vld_d,
    output [31:0]      ifu_exu_pc_d,
@@ -76,6 +78,8 @@ module c7bifu_dec (
 
    wire [31:0] inst_d;
    wire        inst_vld_d;
+   wire        inst_exc_d;
+   wire [5:0]  inst_exc_code_d;
 
    wire [`LDECODE_RES_BIT-1:0] op_d;
 
@@ -98,8 +102,12 @@ module c7bifu_dec (
       .br_offs                         (br_offs_d)
       );
 
-   assign dec_exc_vld_d = (op_d[`LSYSCALL] | op_d[`LBREAK ] | op_d[`LINE]) & ifu_exu_vld_d; // || int_except;
+   //assign dec_exc_vld_d = (op_d[`LSYSCALL] | op_d[`LBREAK ] | op_d[`LINE]) & ifu_exu_vld_d; // || int_except;
+   // A fetch exception entry has no instruction (inst_d is 0), its
+   // exception code wins over whatever 0 decodes to.
+   assign dec_exc_vld_d = (inst_exc_d | op_d[`LSYSCALL] | op_d[`LBREAK ] | op_d[`LINE]) & ifu_exu_vld_d; // || int_except;
    assign dec_exc_code_d = //int_except                ? `EXC_INT          :  // interrupt send into EXU
+                           inst_exc_d      ? inst_exc_code_d :
                            op_d[`LSYSCALL] ? `EXC_SYS :
                            op_d[`LBREAK  ] ? `EXC_BRK :
                            op_d[`LINE    ] ? `EXC_INE :
@@ -253,6 +261,22 @@ module c7bifu_dec (
       .en    (reg_en),
       .clk   (clk),
       .q     (inst_vld_d)
+   );
+
+   // Fetch exception flag and code
+   dffrle_ns #(1) inst_exc_reg (
+      .din   (inst_exc_f & inst_vld_f & ~flush),
+      .rst_l (resetn),
+      .en    (reg_en),
+      .clk   (clk),
+      .q     (inst_exc_d)
+   );
+
+   dffe_ns #(6) inst_exc_code_reg (
+      .din   (inst_exc_code_f),
+      .en    (reg_en),
+      .clk   (clk),
+      .q     (inst_exc_code_d)
    );
 
    // Output valid signal - gated by stall

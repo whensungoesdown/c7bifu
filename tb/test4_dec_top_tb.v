@@ -16,6 +16,8 @@ module top_tb();
     reg         inst_vld_f;
     reg  [31:0] inst_addr_f;
     reg  [31:0] inst_f;
+    reg         inst_exc_f;         // NEW
+    reg  [5:0]  inst_exc_code_f;    // NEW
     
     // =============================
     // Output Signals
@@ -89,6 +91,8 @@ module top_tb();
         .inst_vld_f              (inst_vld_f),
         .inst_addr_f             (inst_addr_f),
         .inst_f                  (inst_f),
+        .inst_exc_f              (inst_exc_f),        // NEW
+        .inst_exc_code_f         (inst_exc_code_f),   // NEW
         .ifu_exu_vld_d           (ifu_exu_vld_d),
         .ifu_exu_pc_d            (ifu_exu_pc_d),
         .ifu_exu_rs1_d           (ifu_exu_rs1_d),
@@ -150,6 +154,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;    // NEW
+            inst_exc_code_f = 0;    // NEW
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -211,6 +217,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -272,6 +280,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -333,6 +343,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -398,6 +410,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -467,6 +481,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -526,6 +542,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -585,6 +603,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -647,6 +667,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -721,6 +743,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -798,6 +822,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -874,6 +900,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -935,6 +963,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1001,6 +1031,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1067,6 +1099,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1137,6 +1171,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1198,6 +1234,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1259,6 +1297,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1320,6 +1360,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1381,6 +1423,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1442,6 +1486,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1503,6 +1549,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1564,6 +1612,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1625,6 +1675,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1690,6 +1742,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1739,6 +1793,8 @@ module top_tb();
             inst_vld_f   = 1;
             inst_addr_f  = expected_pc;
             inst_f       = inst;
+            inst_exc_f      = 0;
+            inst_exc_code_f = 0;
             
             // Wait one clock cycle for signal propagation
             #10;
@@ -1768,6 +1824,63 @@ module top_tb();
             
             // Clear input signals
             inst_vld_f = 0;
+            #10;
+        end
+    endtask
+
+    // =============================
+    // Test Function: fetch exception (NEW)
+    //   - Drives inst_exc_f=1 + inst_exc_code_f
+    //   - Verifies dec_exc_vld_d and dec_exc_code_d pick up the
+    //     fetch-exception path (takes priority over decoder output)
+    //   - Clears inst_exc_f so subsequent tests are unaffected
+    // =============================
+    task test_exc_fetch;
+        input [31:0] expected_pc;
+        input [5:0]  exc_code;
+        begin
+            test_count = test_count + 1;
+            $display("==========================================");
+            $display("Test %0d: fetch exception (code=0x%02h)", test_count, exc_code);
+            $display("==========================================");
+
+            // Drive a fetch exception. inst_f value is irrelevant;
+            // inst_exc_f & inst_vld_f is what gets latched.
+            inst_vld_f       = 1;
+            inst_addr_f      = expected_pc;
+            inst_f           = 32'h0;
+            inst_exc_f       = 1;
+            inst_exc_code_f  = exc_code;
+
+            #10;
+
+            if (ifu_exu_vld_d !== 1'b1) begin
+                $display("[FAIL] Instruction valid at D stage");
+                fail_count = fail_count + 1;
+            end else if (dec_exc_vld_d !== 1'b1) begin
+                $display("[FAIL] Fetch exception not detected");
+                fail_count = fail_count + 1;
+            end else if (dec_exc_code_d !== exc_code) begin
+                $display("[FAIL] Exception code incorrect: 0x%02h (expected 0x%02h)",
+                         dec_exc_code_d, exc_code);
+                fail_count = fail_count + 1;
+            end else begin
+                $display("[PASS] All checks passed");
+                pass_count = pass_count + 1;
+            end
+
+            $display("Detailed results:");
+            $display("  PC: 0x%08h", ifu_exu_pc_d);
+            $display("  inst_vld_d: %b", ifu_exu_vld_d);
+            $display("  exc_vld_d: %b", dec_exc_vld_d);
+            $display("  exc_code_d: 0x%02h", dec_exc_code_d);
+            $display("");
+
+            // IMPORTANT: clear both so subsequent tests don't
+            // latch a stale fetch-exception into inst_exc_d.
+            inst_vld_f       = 0;
+            inst_exc_f       = 0;
+            inst_exc_code_f  = 0;
             #10;
         end
     endtask
@@ -1855,6 +1968,9 @@ module top_tb();
             // Test 26: illegal instruction
             test_exc_illinst(32'h8000_0064, 32'hffffffff);
 
+            // Test 27: fetch exception (ADEF = 0x08)
+            test_exc_fetch(32'h8000_0068, 6'h08);
+
             // Display final statistics
             display_statistics();
         end
@@ -1919,6 +2035,8 @@ module top_tb();
         inst_vld_f   = 0;
         inst_addr_f  = 32'h0;
         inst_f       = 32'h0;
+        inst_exc_f      = 0;    // NEW
+        inst_exc_code_f = 0;    // NEW
         
         // Initialize statistics
         test_count = 0;

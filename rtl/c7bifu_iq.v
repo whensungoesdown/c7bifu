@@ -11,10 +11,17 @@ module c7bifu_iq (
     input  [31:0]      start_addr,
     input              stall,
     input              flush,
+    // fetch exception entry: queued in program order like an instruction
+    input              exc_req,
+    input  [5:0]       exc_code,
+    input  [31:0]      exc_addr,
+    output             exc_ack,
     output             iq_full,
     output [31:0]      inst_addr,
     output [31:0]      inst,
-    output             inst_vld
+    output             inst_vld,
+    output             inst_exc,
+    output [5:0]       inst_exc_code
 );
 
 // ================= Parameter Definitions =================
@@ -27,6 +34,8 @@ localparam COUNTER_WIDTH = PTR_WIDTH + 1;  // 3 bits for counting 0-4 entries
 // ================= Internal Signal Definitions =================
 reg [31:0] queue_addr [0:DEPTH_WORDS-1];
 reg [31:0] queue_data [0:DEPTH_WORDS-1];
+reg        queue_exc  [0:DEPTH_WORDS-1];
+reg [5:0]  queue_exc_code [0:DEPTH_WORDS-1];
 reg [PTR_WIDTH:0] wr_ptr;     // One extra bit for full/empty detection
 reg [PTR_WIDTH:0] rd_ptr;     // One extra bit for full/empty detection
 
@@ -75,6 +84,15 @@ assign iq_full = queue_full;
 assign wr_en = data_vld && !queue_full;
 assign rd_en = !stall && !queue_empty && !flush;
 
+// An exception entry takes one slot. It never comes with fetch data (the
+// faulting fetch returns none), data has priority anyway.
+wire wr_exc = exc_req && !data_vld && (entry_count != DEPTH_WORDS) && !flush;
+assign exc_ack = wr_exc;
+
+// entries written this cycle
+wire [PTR_WIDTH:0] wr_num = wr_en  ? ((skip_first_half && (data_addr == expected_addr)) ? 1 : 2) :
+                            wr_exc ? 1 : 0;
+
 // ================= Entry Counter Logic =================
 always @(posedge clk or negedge resetn) begin
     if (!resetn) begin
@@ -82,24 +100,7 @@ always @(posedge clk or negedge resetn) begin
     end else if (flush) begin
         entry_count <= {(PTR_WIDTH+1){1'b0}};
     end else begin
-        case ({wr_en, rd_en})
-            2'b01:   entry_count <= entry_count - 1'b1;
-            2'b10:   begin
-                if (skip_first_half && (data_addr == expected_addr)) begin
-                    entry_count <= entry_count + 1'b1;
-                end else begin
-                    entry_count <= entry_count + 2'b10;
-                end
-            end
-            2'b11:   begin
-                if (skip_first_half && (data_addr == expected_addr)) begin
-                    entry_count <= entry_count;  // +1-1 = 0
-                end else begin
-                    entry_count <= entry_count + 1'b1;  // +2-1 = +1
-                end
-            end
-            default: entry_count <= entry_count;
-        endcase
+        entry_count <= entry_count + wr_num - (rd_en ? 1 : 0);
     end
 end
 
@@ -118,13 +119,7 @@ always @(posedge clk or negedge resetn) begin
         rd_ptr <= {(PTR_WIDTH+1){1'b0}};
     end else begin
         // Write pointer update
-        if (wr_en) begin
-            if (skip_first_half && (data_addr == expected_addr)) begin
-                wr_ptr <= wr_ptr + 1'b1;
-            end else begin
-                wr_ptr <= wr_ptr + 2'b10;  // Explicit width specification
-            end
-        end
+        wr_ptr <= wr_ptr + wr_num;
         
         // Read pointer update
         if (rd_en) begin
@@ -183,6 +178,33 @@ always @(posedge clk or negedge resetn) begin
                 queue_data[(wr_ptr_idx + 1) % DEPTH_WORDS] <= data[63:32];
             end
         end
+    end else if (wr_exc) begin
+        // exception entry: the faulting address, no instruction
+        queue_addr[wr_ptr_idx] <= exc_addr;
+        queue_data[wr_ptr_idx] <= 32'b0;
+    end
+end
+
+// Exception flag of each entry. A data write clears the flags of the slots
+// it may fill (the second slot is free whenever wr_en is set), an exception
+// entry sets it.
+always @(posedge clk or negedge resetn) begin
+    if (!resetn) begin
+        for (i = 0; i < DEPTH_WORDS; i = i + 1) begin
+            queue_exc[i] <= 1'b0;
+            queue_exc_code[i] <= 6'b0;
+        end
+    end else if (flush) begin
+        for (i = 0; i < DEPTH_WORDS; i = i + 1) begin
+            queue_exc[i] <= 1'b0;
+            queue_exc_code[i] <= 6'b0;
+        end
+    end else if (wr_en) begin
+        queue_exc[wr_ptr_idx] <= 1'b0;
+        queue_exc[(wr_ptr_idx + 1) % DEPTH_WORDS] <= 1'b0;
+    end else if (wr_exc) begin
+        queue_exc[wr_ptr_idx] <= 1'b1;
+        queue_exc_code[wr_ptr_idx] <= exc_code;
     end
 end
 
@@ -192,23 +214,32 @@ end
 reg [31:0] inst_addr_reg;
 reg [31:0] inst_reg;
 reg inst_vld_reg;
+reg inst_exc_reg;
+reg [5:0] inst_exc_code_reg;
 
 always @(posedge clk or negedge resetn) begin
     if (!resetn) begin
         inst_addr_reg <= 32'b0;
         inst_reg <= 32'b0;
         inst_vld_reg <= 1'b0;
+        inst_exc_reg <= 1'b0;
+        inst_exc_code_reg <= 6'b0;
     end else if (flush) begin
         inst_addr_reg <= 32'b0;
         inst_reg <= 32'b0;
         inst_vld_reg <= 1'b0;
+        inst_exc_reg <= 1'b0;
+        inst_exc_code_reg <= 6'b0;
     end else begin
         if (rd_en) begin
             inst_addr_reg <= queue_addr[rd_ptr_idx];
             inst_reg <= queue_data[rd_ptr_idx];
             inst_vld_reg <= 1'b1;
+            inst_exc_reg <= queue_exc[rd_ptr_idx];
+            inst_exc_code_reg <= queue_exc_code[rd_ptr_idx];
         end else begin
             inst_vld_reg <= 1'b0;
+            inst_exc_reg <= 1'b0;
         end
     end
 end
@@ -216,5 +247,7 @@ end
 assign inst_addr = inst_addr_reg;
 assign inst = inst_reg;
 assign inst_vld = inst_vld_reg;
+assign inst_exc = inst_exc_reg;
+assign inst_exc_code = inst_exc_code_reg;
 
 endmodule

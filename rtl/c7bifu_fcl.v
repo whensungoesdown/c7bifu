@@ -125,8 +125,11 @@ module c7bifu_fcl (
    always @(posedge clk or negedge resetn) begin
       if (!resetn)
          hold_fcl_req <= 1'b0;
-      else if (exu_ifu_except)
-         hold_fcl_req <= 1'b0;          // 处理异常请求，清除 hold，优先级最高
+      // A branch or ertn also drops the held fetch exception: c7bifu
+      // discards it on flush, so no exu_ifu_except will come to release
+      // the hold and fetch would stop forever.
+      else if (flush)
+         hold_fcl_req <= 1'b0;          // 异常/分支/ertn 刷新时清除 hold，优先级最高
       else if (fetch_except_hold)
          hold_fcl_req <= 1'b1;          // 检测到 fetch_except_hold，置起 hold
    end

@@ -198,6 +198,17 @@ module c7bifu (
 
    wire fet_exc_vld;
 
+   // fetch exception, see "fetch exception" below
+   wire        fexc_det;
+   wire        fexc_pend_q;
+   wire        fexc_queued_q;
+   wire        fexc_ack;
+   wire [5:0]  fexc_code_q;
+   wire [31:0] fexc_addr_q;
+
+   wire        inst_exc_f;
+   wire [5:0]  inst_exc_code_f;
+
    wire dec_exc_vld_d;
    wire [5:0] dec_exc_code_d;
    
@@ -287,7 +298,8 @@ module c7bifu (
       .csr_ifu_ic_en_pls               (csr_ifu_ic_en_pls),
 
       //.fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2),
-      .fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2 | tlbr_exception | pif_exception | ppi_exception),
+      //.fetch_except_hold               (biu_ifu_fault | icu_ifu_fault_ic2 | tlbr_exception | pif_exception | ppi_exception),
+      .fetch_except_hold               (fexc_det),
 
       .pf_addr_sel_init                (pf_addr_sel_init),
       .pf_addr_sel_old                 (pf_addr_sel_old),
@@ -325,16 +337,24 @@ module c7bifu (
       //.data                            (icu_ifu_data_ic2),
       .data                            (data),
       //.data_vld                        (icu_data_vld),
-      .data_vld                        (fcl_data_vld),
+      //.data_vld                        (fcl_data_vld),
+      // a faulting fetch returns no instructions, do not queue its data
+      .data_vld                        (fcl_data_vld & ~fet_exc_vld),
       //.start_addr                      (ifu_icu_addr_ic1),
       .start_addr                      (iq_start_addr),
       .stall                           (stall_iq),
       //.flush                           (flush),
       .flush                           (flush | flush_dly1), // because ifu_icu_addr_ic1 takes pf_vaddr_q install of pf_vaddr_in, there is 1 cycle delay, therefore the iq also needs to wait 1 cycel for the correct updated ifu_icu_addr_ic1
+      .exc_req                         (fexc_pend_q & ~fexc_queued_q),
+      .exc_code                        (fexc_code_q),
+      .exc_addr                        (fexc_addr_q),
+      .exc_ack                         (fexc_ack),
       .iq_full                         (iq_full),
       .inst_addr                       (inst_addr_f),
       .inst                            (inst_f),
-      .inst_vld                        (inst_vld_f)
+      .inst_vld                        (inst_vld_f),
+      .inst_exc                        (inst_exc_f),
+      .inst_exc_code                   (inst_exc_code_f)
    );
 
 
@@ -479,6 +499,8 @@ module c7bifu (
       .inst_vld_f                      (inst_vld_f),
       .inst_addr_f                     (inst_addr_f),
       .inst_f                          (inst_f),
+      .inst_exc_f                      (inst_exc_f),
+      .inst_exc_code_f                 (inst_exc_code_f),
 
       //.ifu_exu_vld_d                   (ifu_exu_vld_d),
       .ifu_exu_vld_d                   (dec_vld_d),
@@ -545,35 +567,46 @@ module c7bifu (
    assign fet_exc_vld = biu_ifu_fault | icu_ifu_fault_ic2;
    // biu_ifu_fault_code is not used for now
 
-   // When ifu_exu_exc_vld_d is asserted, EXU must cancel execution of any
-   // simultaneously valid instruction.
-   //assign ifu_exu_exc_vld_d = dec_exc_vld_d; // | other front exceptions
-   //assign ifu_exu_exc_code_d = dec_exc_code_d;
+   //
+   // fetch exception
+   //
+   // TLBR/PIF/PPI and ADEF are detected for the fetch at pf_vaddr_q, which
+   // is younger than every instruction still in the IQ or in decode. Instead
+   // of attaching the exception to whatever sits in decode (ERA would then
+   // point to an older or already executed instruction), it is written into
+   // the IQ as an entry of its own, with pf_vaddr_q as its address. It
+   // reaches decode in program order, after all older instructions, and
+   // goes to EXU through dec_exc_vld_d with its own PC (-> ERA) and BADV.
+   //
+   // Fetch stops (fetch_except_hold) until the exception or another flush
+   // is taken. A flush drops the pending exception and the IQ entry; the
+   // fetch is repeated if the path comes back to it.
 
-   //assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld;
-   //assign ifu_exu_exc_code_d = fet_exc_vld ? `EXC_ADEF: dec_exc_code_d;
-   //assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld | tlbr_exception;
-   //assign ifu_exu_exc_code_d = tlbr_exception ? `EXC_TLBR :
-   //                         (fet_exc_vld ? `EXC_ADEF : dec_exc_code_d);
-   //assign ifu_exu_exc_badv_d = ic_en ? ifu_icu_addr_ic1 : ifu_biu_rd_addr;
+   // fcl_data_vld is data_vld without the cancelled (pre-flush) responses
+   wire fet_exc_ok = fet_exc_vld & fcl_data_vld;
 
-   assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld | tlbr_exception | pif_exception | ppi_exception;
-   
-   // priority: dec > fet > tlbr > pif
-   assign ifu_exu_exc_code_d = dec_exc_vld_d ? dec_exc_code_d  :
-                               fet_exc_vld    ? `EXC_ADEF      :
-                               tlbr_exception ? `EXC_TLBR      :
-                               pif_exception  ? `EXC_PIF       :
-                               ppi_exception  ? `EXC_PPI       :
-                                                6'b0;
+   assign fexc_det = fet_exc_ok | tlbr_exception | pif_exception | ppi_exception;
+
+   // priority: fet > tlbr > pif > ppi
+   wire [5:0] fexc_det_code = fet_exc_ok     ? `EXC_ADEF :
+                              tlbr_exception ? `EXC_TLBR :
+                              pif_exception  ? `EXC_PIF  :
+                                               `EXC_PPI  ;
+
+   wire fexc_set = fexc_det & ~fexc_pend_q & ~flush;
+
+   //assign ifu_exu_exc_vld_d = dec_exc_vld_d | fet_exc_vld | tlbr_exception | pif_exception | ppi_exception;
+   // fetch exceptions come out of decode now, together with syscall/break/ine
+   assign ifu_exu_exc_vld_d = dec_exc_vld_d;
+
+   assign ifu_exu_exc_code_d = dec_exc_code_d;
 
    // tlbr_exception subcode: itlb 0, dtlb 1
    assign ifu_exu_exc_subcode_d = 8'b0;
 
-   // badv : bad virtual address 
-   assign ifu_exu_exc_badv_d = (tlbr_exception | pif_exception | ppi_exception | fet_exc_vld) ?
-                               pf_vaddr_q :
-                               ifu_exu_pc_d;
+   // badv : bad virtual address
+   // for a fetch exception entry ifu_exu_pc_d is the faulting fetch address
+   assign ifu_exu_exc_badv_d = ifu_exu_pc_d;
 
    // this instruction carries the ADEF exception, so, we have to valid it
    // even though this may not be a valid instruction.
@@ -583,6 +616,31 @@ module c7bifu (
    //
    // Registers
    //
+
+   dffrl_ns #(1) fexc_pend_reg (
+      .din   ((fexc_pend_q | fexc_set) & ~flush),
+      .clk   (clk),
+      .rst_l (resetn),
+      .q     (fexc_pend_q));
+
+   // the exception entry has been written into the IQ
+   dffrl_ns #(1) fexc_queued_reg (
+      .din   ((fexc_queued_q | fexc_ack) & ~flush),
+      .clk   (clk),
+      .rst_l (resetn),
+      .q     (fexc_queued_q));
+
+   dffe_ns #(6) fexc_code_reg (
+      .din (fexc_det_code),
+      .en  (fexc_set),
+      .clk (clk),
+      .q   (fexc_code_q));
+
+   dffe_ns #(32) fexc_addr_reg (
+      .din (pf_vaddr_q),
+      .en  (fexc_set),
+      .clk (clk),
+      .q   (fexc_addr_q));
 
    dffe_ns #(32) pf_addr_reg (
       .din (pf_vaddr_in),

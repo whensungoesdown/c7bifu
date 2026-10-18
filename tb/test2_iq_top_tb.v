@@ -25,25 +25,41 @@ reg         data_vld;
 reg  [31:0] start_addr;
 reg         stall;
 reg         flush;
+
+// --- Exception ports (added to match updated DUT) ---
+reg         exc_req;
+reg  [5:0]  exc_code;
+reg  [31:0] exc_addr;
+wire        exc_ack;
+
+// --- Outputs ---
 wire        iq_full;
 wire [31:0] inst_addr;
 wire [31:0] inst;
 wire        inst_vld;
+wire        inst_exc;
+wire [5:0]  inst_exc_code;
 
 // ================= Instantiate DUT =================
 c7bifu_iq dut (
-    .clk         (clk),
-    .resetn      (resetn),
-    .data_addr   (data_addr),
-    .data        (data),
-    .data_vld    (data_vld),
-    .start_addr  (start_addr),
-    .stall       (stall),
-    .flush       (flush),
-    .iq_full     (iq_full),
-    .inst_addr   (inst_addr),
-    .inst        (inst),
-    .inst_vld    (inst_vld)
+    .clk           (clk),
+    .resetn        (resetn),
+    .data_addr     (data_addr),
+    .data          (data),
+    .data_vld      (data_vld),
+    .start_addr    (start_addr),
+    .stall         (stall),
+    .flush         (flush),
+    .exc_req       (exc_req),
+    .exc_code      (exc_code),
+    .exc_addr      (exc_addr),
+    .exc_ack       (exc_ack),
+    .iq_full       (iq_full),
+    .inst_addr     (inst_addr),
+    .inst          (inst),
+    .inst_vld      (inst_vld),
+    .inst_exc      (inst_exc),
+    .inst_exc_code (inst_exc_code)
 );
 
 // ================= Test Variables =================
@@ -73,13 +89,16 @@ task reset_test;
         $display("[%0t] Test %0d: Reset Test", $time, test_num);
         $display("[%0t] ==================================================", $time);
         
-        resetn = 1'b0;
+        resetn    = 1'b0;
         data_addr = 32'h0;
         start_addr = 32'h0;
-        data = 64'h0;
-        data_vld = 1'b0;
-        stall = 1'b0;
-        flush = 1'b0;
+        data      = 64'h0;
+        data_vld  = 1'b0;
+        stall     = 1'b0;
+        flush     = 1'b0;
+        exc_req   = 1'b0;
+        exc_code  = 6'b0;
+        exc_addr  = 32'h0;
         @(posedge clk);
         @(posedge clk);
         
@@ -173,10 +192,10 @@ task read_instructions;
         @(posedge clk);
         
         $display("  Total instructions read: %0d", instructions_read);
-	if (instructions_read !== 4) begin
+        if (instructions_read !== 4) begin
             $display("  ERROR: Should read 4 instructions!");
             error_count = error_count + 1;
-	end
+        end
 
         test_num = test_num + 1;
     end
@@ -223,7 +242,7 @@ task test_queue_capacity;
                 i = 4;  // Exit loop
             end
             
-	    // data_vld at every cycle
+            // data_vld at every cycle
             //data_vld = 1'b0;
             //@(posedge clk);
 
@@ -321,9 +340,9 @@ task test_stall_operation;
 
         @(posedge clk);
         @(posedge clk); // after stall, there is one cycle gap, it is acceptable
-	//   stall    : ----_______
-	//   inst_vld : _____--____
-	//
+        //   stall    : ----_______
+        //   inst_vld : _____--____
+        //
 
         if (!inst_vld) begin
             $display("  ERROR: No instruction read after releasing stall");
@@ -398,16 +417,19 @@ endtask
 // ================= Main Test Sequence =================
 initial begin
     // Initialize
-    test_num = 1;
+    test_num    = 1;
     error_count = 0;
     cycle_count = 0;
     
-    data_addr = 32'h0;
-    data = 64'h0;
-    data_vld = 1'b0;
+    data_addr  = 32'h0;
+    data       = 64'h0;
+    data_vld   = 1'b0;
     start_addr = 32'h0;
-    stall = 1'b0;
-    flush = 1'b0;
+    stall      = 1'b0;
+    flush      = 1'b0;
+    exc_req    = 1'b0;
+    exc_code   = 6'b0;
+    exc_addr   = 32'h0;
     
     // Wait for reset to be released
     @(posedge resetn);
@@ -506,10 +528,10 @@ end
 // ================= Enhanced Monitoring =================
 always @(posedge clk) begin
     // Monitor control state changes
-    if (resetn && (data_vld || inst_vld || flush || stall)) begin
-        $display("[%0t] Cycle %0d: state={wr:%b, rd:%b, full:%b, flush:%b, stall:%b}", 
+    if (resetn && (data_vld || inst_vld || flush || stall || exc_req)) begin
+        $display("[%0t] Cycle %0d: state={wr:%b, rd:%b, full:%b, flush:%b, stall:%b, exc_req:%b, exc_ack:%b}", 
                  $time, cycle_count, 
-                 data_vld, inst_vld, iq_full, flush, stall);
+                 data_vld, inst_vld, iq_full, flush, stall, exc_req, exc_ack);
     end
 end
 
