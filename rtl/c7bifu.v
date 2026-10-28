@@ -417,8 +417,11 @@ module c7bifu (
    assign itlb_csr_tlbidx_e = tlbsrch_vld_m ? tlb_s_found : tlbidx_e;
 
    wire itlb_inv_en;
-   assign itlb_inv_en = exu_itlb_invtlb_vld_e & ~csr_itlb_tlbidx_i_d; 
-   //assign itlb_inv_en = exu_itlb_invtlb_vld_e; 
+   //assign itlb_inv_en = exu_itlb_invtlb_vld_e & ~csr_itlb_tlbidx_i_d;
+   // INVTLB has no index: invalidate matching entries in both the ITLB and
+   // the DTLB, independent of TLBIDX.I_D, as on a unified TLB. Gating it
+   // with I_D left stale entries in the other TLB after a page flush (COW).
+   assign itlb_inv_en = exu_itlb_invtlb_vld_e;
 
 
    c7btlb u_itlb(
